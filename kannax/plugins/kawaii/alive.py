@@ -155,13 +155,15 @@ async def _send_one_alive_media(message: Message, media: str, caption: str) -> N
     is_anim = (media or "").lower().split("?")[0].endswith((".gif", ".mp4"))
     local = None
     own_tmp = False
-    if media.startswith("http"):
-        # download first: Telegram servers often refuse to fetch
-        # third-party hosts (WEBPAGE_CURL_FAILED). Result is cached
-        # on disk per URL so ,alive answers instantly after the
-        # first call instead of re-downloading ~3MB every time.
+    if media.startswith("http") and "telegra.ph" not in media:
+        # Third-party hosts (e.g. files.catbox.moe) are often refused
+        # by Telegram servers (WEBPAGE_CURL_FAILED), so download first
+        # (cached on disk). telegra.ph URLs go direct — fast path,
+        # same as the original behavior.
         local, own_tmp = await _download_cached(media)
-    target = local or media
+        target = local or media
+    else:
+        target = media
     try:
         if is_anim:
             await message.client.send_animation(
