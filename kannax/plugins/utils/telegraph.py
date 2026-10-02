@@ -1,11 +1,52 @@
 import os
 
-from telegraph import upload_file
+import requests
 
 from kannax import Config, Message, kannax
 from kannax.utils import progress
 
 _T_LIMIT = 5242880
+_TELEGRAPH_UPLOAD_URL = "https://telegra.ph/upload"
+
+
+def _telegraph_upload(dl_loc: str) -> str:
+    """Upload a file to telegra.ph without the broken `telegraph` lib wrapper.
+
+    The lib's TelegraphApi.upload_file() does response[0].get('error'),
+    but telegra.ph now returns a plain list of path strings
+    (e.g. ["/file/abc.jpg"]), so every upload crashed with
+    "'str' object has no attribute 'get'". Posting directly and
+    accepting both response shapes fixes setalive/telegraph.
+    """
+    with open(dl_loc, "rb") as f:
+        resp = requests.post(
+            _TELEGRAPH_UPLOAD_URL,
+            files={"file": (os.path.basename(dl_loc), f)},
+            timeout=60,
+        )
+    resp.raise_for_status()
+    data = resp.json()
+    if isinstance(data, dict):
+        err = data.get("error")
+        if err:
+            raise RuntimeError(f"telegraph: {err}")
+        # some mirrors return {"src": ...} / {"path": ...} / {"url": ...}
+        for key in ("src", "path", "url"):
+            if data.get(key):
+                path = str(data[key])
+                return path if path.startswith("/") else "/" + path
+        raise RuntimeError(f"telegraph: unexpected response {data!r}")
+    if isinstance(data, list) and data:
+        first = data[0]
+        if isinstance(first, dict):
+            if first.get("error"):
+                raise RuntimeError(f"telegraph: {first['error']}")
+            path = str(first.get("src") or first.get("path") or "")
+        else:
+            path = str(first)
+        if path:
+            return path if path.startswith("/") else "/" + path
+    raise RuntimeError(f"telegraph: unexpected response {data!r}")
 
 
 @kannax.on_cmd(
@@ -76,7 +117,7 @@ async def upload_media_(message: Message):
         return None
     await message.edit("`fazendo upload no telegraph...`")
     try:
-        response = upload_file(dl_loc)
+        response = _telegraph_upload(dl_loc)
     except Exception as t_e:
         await message.err(f"falha no upload p/ telegraph: `{t_e}`")
         return None
@@ -88,4 +129,4 @@ async def upload_media_(message: Message):
     if not response:
         await message.err("telegraph retornou resposta vazia.")
         return None
-    return str(response[0])
+    return response
