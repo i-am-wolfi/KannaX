@@ -2,7 +2,12 @@
 
 """novo alive para kannax"""
 
-from kannax import Message, get_collection, kannax, get_version
+import os
+import tempfile
+
+import requests
+
+from kannax import Config, Message, get_collection, kannax, get_version
 from kannax.utils import rand_array
 from kannax.plugins.bot.ialive import Bot_Alive 
 from kannax.versions import __python_version__
@@ -100,10 +105,7 @@ async def view_del_ani(message: Message):
     """new alive"""
     _findpma = await SAVED.find_one({"_id": "ALIVE_MEDIA"})
     _findamsg = await SAVED.find_one({"_id": "ALIVE_MSG"})
-    if _findpma is None:
-        media = "https://telegra.ph/file/8bfc66ff423f8263f8ca4.png"
-    else:
-        media = _findpma.get("link")
+    media = (_findpma.get("link") if _findpma else None) or Config.ALIVE_MEDIA
     if _findamsg is None:
         mmsg = rand_array(FRASES)
     else:
@@ -121,17 +123,70 @@ async def view_del_ani(message: Message):
 
     ✨ [sᴜᴘᴏʀᴛᴇ ](https://t.me/fnixsup) | 👾 [ʀᴇᴘᴏ](https://github.com/fnixdev/Kanna-X)
 """
-    if media.endswith((".gif", ".mp4")):
-        await message.client.send_animation(
-            chat_id=message.chat.id,
-            animation=media,
-            caption=alive_msg
-        )
-    else:
-        await message.client.send_photo(
-            chat_id=message.chat.id, photo=media, caption=alive_msg
-        )
+    await _send_alive_media(message, media, alive_msg)
     await message.delete()
+
+
+async def _send_alive_media(message: Message, media: str, caption: str) -> None:
+    """Send alive media; falls back gracefully.
+
+    1. Try the saved media (download URL locally first so Telegram
+       never has to fetch it — avoids WEBPAGE_CURL_FAILED on hosts
+       like files.catbox.moe or dead telegra.ph links).
+    2. On any failure, retry with the Config.ALIVE_MEDIA default.
+    """
+    candidates = [media]
+    if media != Config.ALIVE_MEDIA:
+        candidates.append(Config.ALIVE_MEDIA)
+    last_err = None
+    for cand in candidates:
+        try:
+            await _send_one_alive_media(message, cand, caption)
+            return
+        except Exception as e:
+            last_err = e
+    await message.err(f"alive falhou: `{last_err}`")
+
+
+async def _send_one_alive_media(message: Message, media: str, caption: str) -> None:
+    is_anim = media.lower().split("?")[0].endswith((".gif", ".mp4"))
+    local = None
+    if media.startswith("http"):
+        # download first: Telegram servers often refuse to fetch
+        # third-party hosts (WEBPAGE_CURL_FAILED)
+        local = await _download_temp(media)
+    target = local or media
+    try:
+        if is_anim:
+            await message.client.send_animation(
+                chat_id=message.chat.id,
+                animation=target,
+                caption=caption,
+            )
+        else:
+            await message.client.send_photo(
+                chat_id=message.chat.id, photo=target, caption=caption
+            )
+    finally:
+        if local:
+            try:
+                os.remove(local)
+            except OSError:
+                pass
+
+
+async def _download_temp(url: str) -> str | None:
+    """Download a URL to a temp file. Returns path or None."""
+    try:
+        resp = requests.get(url, timeout=60)
+        resp.raise_for_status()
+        suffix = os.path.splitext(url.split("?")[0])[1][:8] or ".jpg"
+        fd, path = tempfile.mkstemp(suffix=suffix)
+        with os.fdopen(fd, "wb") as f:
+            f.write(resp.content)
+        return path
+    except Exception:
+        return None
 
 
 @kannax.on_cmd(
