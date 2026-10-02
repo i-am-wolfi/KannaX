@@ -105,7 +105,11 @@ async def view_del_ani(message: Message):
     """new alive"""
     _findpma = await SAVED.find_one({"_id": "ALIVE_MEDIA"})
     _findamsg = await SAVED.find_one({"_id": "ALIVE_MSG"})
-    media = (_findpma.get("link") if _findpma else None) or Config.ALIVE_MEDIA
+_DEFAULT_ALIVE_MEDIA = "https://telegra.ph/file/8bfc66ff423f8263f8ca4.png"
+
+    media = (_findpma.get("link") if _findpma else None) or getattr(
+        Config, "ALIVE_MEDIA", None
+    )
     if _findamsg is None:
         mmsg = rand_array(FRASES)
     else:
@@ -135,9 +139,7 @@ async def _send_alive_media(message: Message, media: str, caption: str) -> None:
        like files.catbox.moe or dead telegra.ph links).
     2. On any failure, retry with the Config.ALIVE_MEDIA default.
     """
-    candidates = [media]
-    if media != Config.ALIVE_MEDIA:
-        candidates.append(Config.ALIVE_MEDIA)
+    candidates = [m for m in (media, getattr(Config, "ALIVE_MEDIA", None), _DEFAULT_ALIVE_MEDIA) if m]
     last_err = None
     for cand in candidates:
         try:
@@ -149,7 +151,7 @@ async def _send_alive_media(message: Message, media: str, caption: str) -> None:
 
 
 async def _send_one_alive_media(message: Message, media: str, caption: str) -> None:
-    is_anim = media.lower().split("?")[0].endswith((".gif", ".mp4"))
+    is_anim = (media or "").lower().split("?")[0].endswith((".gif", ".mp4"))
     local = None
     if media.startswith("http"):
         # download first: Telegram servers often refuse to fetch
