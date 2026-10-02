@@ -11,12 +11,12 @@ LOG = kannax.getLogger(__name__)
 
 
 @kannax.on_cmd(
-    "mute",
+    "lmute",
     about={
         "header": "Mute a user in this chat",
         "description": "Messages from the muted user are deleted, "
         "even if they are admin (uses delete, not restrict).",
-        "examples": "{tr}mute [userid | reply] [reason]",
+        "examples": "{tr}lmute [userid | reply] [reason]",
     },
     allow_channels=False,
     allow_bots=False,
@@ -53,10 +53,10 @@ async def mute_user(msg: Message):
 
 
 @kannax.on_cmd(
-    "unmute",
+    "lunmute",
     about={
         "header": "Unmute a user in this chat",
-        "examples": "{tr}unmute [userid | reply]",
+        "examples": "{tr}lunmute [userid | reply]",
     },
     allow_channels=False,
     allow_bots=False,
@@ -81,10 +81,10 @@ async def unmute_user(msg: Message):
 
 
 @kannax.on_cmd(
-    "mutelist",
+    "lmutelist",
     about={
         "header": "List users muted in this chat",
-        "examples": "{tr}mutelist",
+        "examples": "{tr}lmutelist",
     },
     allow_channels=False,
 )
