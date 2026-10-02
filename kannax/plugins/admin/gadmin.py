@@ -11,14 +11,33 @@ from pyrogram.errors import (
     UserIdInvalid,
     UsernameInvalid,
 )
+from pyrogram.errors.exceptions.forbidden_403 import MessageDeleteForbidden
 from pyrogram.methods.chats import delete_channel
 from pyrogram.types import ChatPermissions
 
-from kannax import Config, Message, kannax
+from kannax import Config, Message, filters, get_collection, kannax
 from kannax.utils.functions import get_emoji_regex
 from kannax.utils import is_dev
 
 CHANNEL = kannax.getCLogger(__name__)
+
+# delete-mode mute list (admins: no demote, messages just vanish — cat style)
+MUTE_BASE = get_collection("MUTE_USER")
+
+
+async def _mute_delete_mode(chat_id: int, user_id: int, reason: str = "") -> bool:
+    """Put user on delete-mode list. Returns True if newly added."""
+    found = await MUTE_BASE.find_one({"user_id": user_id, "chat_id": chat_id})
+    if found:
+        return False
+    await MUTE_BASE.insert_one(
+        {"user_id": user_id, "chat_id": chat_id, "reason": reason or ""}
+    )
+    return True
+
+
+def _is_group_admin(member) -> bool:
+    return getattr(member, "status", None) in ("administrator", "owner")
 
 
 @kannax.on_cmd(
@@ -415,6 +434,21 @@ async def mute_usr(message: Message):
             get_mem = await message.client.get_chat_member(chat_id, user_id)
             if is_dev(get_mem.user.id):
                 return await message.reply("`Lol ele é meu desenvolvedor porque iria muta-lo?.`")
+            if _is_group_admin(get_mem):
+                # admin: no demote — delete-mode (cat style)
+                added = await _mute_delete_mode(chat_id, get_mem.user.id, reason)
+                await message.edit(
+                    "#MUTE (delete-mode)\n\n"
+                    f"USER: [{get_mem.user.first_name}](tg://user?id={get_mem.user.id}) "
+                    f"(`{get_mem.user.id}`)\n"
+                    f"CHAT: `{message.chat.title}` (`{chat_id}`)\n"
+                    f"MUTE UNTIL: `{_time}`\n"
+                    f"REASON: `{reason}`\n"
+                    "`Admin mantido: mensagens serão apagadas.`"
+                    if added else "`Esse admin já está em delete-mode.`",
+                    log=__name__,
+                )
+                return
             await message.client.restrict_chat_member(
                 chat_id, user_id, ChatPermissions(), int(time.time() + mute_period)
             )
@@ -448,6 +482,21 @@ async def mute_usr(message: Message):
     else:
         try:
             get_mem = await message.client.get_chat_member(chat_id, user_id)
+            if _is_group_admin(get_mem):
+                # admin: no demote — delete-mode (cat style)
+                added = await _mute_delete_mode(chat_id, get_mem.user.id, reason)
+                await message.edit(
+                    "#MUTE (delete-mode)\n\n"
+                    f"USER: [{get_mem.user.first_name}](tg://user?id={get_mem.user.id}) "
+                    f"(`{get_mem.user.id}`)\n"
+                    f"CHAT: `{message.chat.title}` (`{chat_id}`)\n"
+                    f"MUTE UNTIL: `forever`\n"
+                    f"REASON: `{reason}`\n"
+                    "`Admin mantido: mensagens serão apagadas.`"
+                    if added else "`Esse admin já está em delete-mode.`",
+                    log=__name__,
+                )
+                return
             await message.client.restrict_chat_member(
                 chat_id, user_id, ChatPermissions()
             )
@@ -502,6 +551,7 @@ async def unmute_usr(message: Message):
         return
     try:
         get_mem = await message.client.get_chat_member(chat_id, user_id)
+        await MUTE_BASE.delete_one({"user_id": get_mem.user.id, "chat_id": chat_id})
         await message.client.unban_chat_member(chat_id, user_id)
         await message.edit("`🛡 Desmutado com Sucesso..`", del_in=5)
         await CHANNEL.log(
@@ -786,3 +836,24 @@ async def smode_switch(message: Message):
         await message.edit(
             "`flag type/mode inválido.. use .help smode para informações!!`", del_in=5
         )
+
+
+@kannax.on_filters(
+    filters.group & filters.incoming & ~filters.edited,
+    group=2,
+    check_restrict_perm=True,
+)
+async def mute_watcher(msg: Message):
+    """delete messages from delete-mode muted users (admins kept, cat style)"""
+    if not msg.from_user:
+        return
+    muted = await MUTE_BASE.find_one(
+        {"user_id": msg.from_user.id, "chat_id": msg.chat.id}
+    )
+    if muted:
+        try:
+            await msg.delete()
+        except MessageDeleteForbidden:
+            pass
+        except Exception:
+            pass
