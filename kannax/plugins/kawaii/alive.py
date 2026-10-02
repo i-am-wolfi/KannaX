@@ -16,6 +16,8 @@ from kannax.plugins.utils.telegraph import upload_media_
 
 SAVED = get_collection("ALIVE_DB")
 
+_DEFAULT_ALIVE_MEDIA = "https://telegra.ph/file/8bfc66ff423f8263f8ca4.png"
+
 ALIVE_MSG = {}
 
 async def _init():
@@ -105,8 +107,6 @@ async def view_del_ani(message: Message):
     """new alive"""
     _findpma = await SAVED.find_one({"_id": "ALIVE_MEDIA"})
     _findamsg = await SAVED.find_one({"_id": "ALIVE_MSG"})
-_DEFAULT_ALIVE_MEDIA = "https://telegra.ph/file/8bfc66ff423f8263f8ca4.png"
-
     media = (_findpma.get("link") if _findpma else None) or getattr(
         Config, "ALIVE_MEDIA", None
     )
