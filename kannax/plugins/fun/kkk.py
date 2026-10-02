@@ -21,11 +21,11 @@ async def k_(message: Message):
     """K KK KKK ..."""
     letter = (message.input_str or "K").strip().split()[0][:1].upper() or "K"
     text = ""
-    for _ in range(20):
-        text += letter
+    for _ in range(0, 20, 3):
+        text += letter * 3
         try:
-            await message.edit(f"`{text}`")
+            await message.edit(f"`{text[:20]}`")
         except FloodWait as x_e:
             await asyncio.sleep(x_e.x)
-            await message.edit(f"`{text}`")
-        await asyncio.sleep(0.3)
+            await message.edit(f"`{text[:20]}`")
+        await asyncio.sleep(1)
