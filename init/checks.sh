@@ -139,7 +139,9 @@ _setupPlugins() {
         mv $tmp/plugins/ kannax/plugins/$path/
         cp -r $tmp/resources/. resources/
         rm -rf $tmp/
+        _LOGBOT_CLEANUP=1
         deleteLastMessage
+        _LOGBOT_CLEANUP=0
     else
         editLastMessage "$1 Plugins Desativados !"
     fi
@@ -154,7 +156,12 @@ _checkCustomPlugins() {
 }
 
 _flushMessages() {
+    # limpeza cosmética das msgs do logbot; falha aqui não pode matar o boot
+    # (ex.: 400 msg já apagada). Usa flag em vez de subshell para não quebrar
+    # o tracking em memória (_allMessages) do processo principal.
+    _LOGBOT_CLEANUP=1
     deleteLastMessage
+    _LOGBOT_CLEANUP=0
 }
 
 assertPrerequisites() {

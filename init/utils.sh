@@ -5,7 +5,7 @@
 # Editado por fnixdev
 
 declare -r minPVer=8
-declare -r maxPVer=9
+declare -r maxPVer=14
 
 getPythonVersion() {
     local -i count=$minPVer

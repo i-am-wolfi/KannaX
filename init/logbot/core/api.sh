@@ -36,6 +36,10 @@ _getResponse() {
         else
             local errcode=$(echo $rawUpdate | jq .error_code)
             local desc=$(echo $rawUpdate | jq .description)
+            if test -n "$_LOGBOT_CLEANUP"; then
+                log "aviso: falha em limpeza do logbot (seguindo): $desc"
+                return 1
+            fi
             quit "invalid request ! (caused by core.api.$FUNCNAME)
 \terror_code : [$errcode]
 \tdescription : $desc"
