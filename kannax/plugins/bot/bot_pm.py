@@ -75,7 +75,13 @@ if kannax.has_bot:
     async def get_bot_pm_media() -> None:
         global _BOT_PM_MEDIA
         if not Config.BOT_MEDIA:
-            _BOT_PM_MEDIA = get_file_id(await kannax.bot.get_messages("kannagifs", 6))
+            try:
+                _BOT_PM_MEDIA = get_file_id(
+                    await kannax.bot.get_messages("kannagifs", 6)
+                )
+            except Exception as media_err:  # canal @kannagifs pode não existir mais
+                LOGGER.error(f"mídia padrão do bot indisponível: {media_err}")
+                _BOT_PM_MEDIA = None
             return
         if Config.BOT_MEDIA.strip().lower() != "false":
             match = _TG_LINK_REGEX.search(Config.BOT_MEDIA)
@@ -133,6 +139,11 @@ if kannax.has_bot:
         else:
             if not _BOT_PM_MEDIA:
                 await get_bot_pm_media()
+            if not _BOT_PM_MEDIA:  # sem mídia -> texto simples
+                await message.reply(
+                    text, disable_web_page_preview=True, reply_markup=markup
+                )
+                return
             await message.reply_cached_media(
                 file_id=_BOT_PM_MEDIA, caption=text, reply_markup=markup
             )
