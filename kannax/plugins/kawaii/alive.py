@@ -140,7 +140,7 @@ async def view_del_ani(message: Message):
 • **Bot Version**  :  `v{get_version()}`
 • **Python Version**  :  `v{__python_version__}`
 
-    ✨ [sᴜᴘᴏʀᴛᴇ ](https://t.me/WolfRedicopa) | 👾 [ʀᴇᴘᴏ](https://github.com/i-am-wolfi/KannaX) | ᴄʀɪᴀᴅᴏʀ ᴏʀɪɢɪɴᴀʟ: [fnixdev](https://github.com/fnixdev)
+    ✨ [sᴜᴘᴏʀᴛᴇ ](https://t.me/Userbots_Support) | 👾 [ʀᴇᴘᴏ](https://github.com/i-am-wolfi/KannaX)
 """
     await _send_alive_media(
         message,
