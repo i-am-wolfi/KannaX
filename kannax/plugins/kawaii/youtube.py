@@ -11,7 +11,7 @@ import tempfile
 
 from pathlib import Path
 from yt_dlp import YoutubeDL
-from youtubesearchpython import SearchVideos
+from youtubesearchpython import VideosSearch
 
 from kannax import kannax, Message
 from ..bot.utube_inline import BASE_YT_URL, get_yt_video_id
@@ -124,8 +124,8 @@ async def get_link(query):
     link = f"{BASE_YT_URL}{vid_id}"
     if vid_id is None:
         try:
-            res_ = SearchVideos(query, offset=1, mode="json", max_results=1)
-            link = json.loads(res_.result())["search_result"][0]["link"]
+            res_ = VideosSearch(query, limit=1)
+            link = res_.result()["result"][0]["link"]
             return link
         except Exception as e:
             LOGGER.exception(e)
