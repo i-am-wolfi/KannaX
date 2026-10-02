@@ -2,6 +2,7 @@
 
 """novo alive para kannax"""
 
+import hashlib
 import os
 import tempfile
 
@@ -153,10 +154,13 @@ async def _send_alive_media(message: Message, media: str, caption: str) -> None:
 async def _send_one_alive_media(message: Message, media: str, caption: str) -> None:
     is_anim = (media or "").lower().split("?")[0].endswith((".gif", ".mp4"))
     local = None
+    own_tmp = False
     if media.startswith("http"):
         # download first: Telegram servers often refuse to fetch
-        # third-party hosts (WEBPAGE_CURL_FAILED)
-        local = await _download_temp(media)
+        # third-party hosts (WEBPAGE_CURL_FAILED). Result is cached
+        # on disk per URL so ,alive answers instantly after the
+        # first call instead of re-downloading ~3MB every time.
+        local, own_tmp = await _download_cached(media)
     target = local or media
     try:
         if is_anim:
@@ -170,11 +174,34 @@ async def _send_one_alive_media(message: Message, media: str, caption: str) -> N
                 chat_id=message.chat.id, photo=target, caption=caption
             )
     finally:
-        if local:
+        if local and own_tmp:
             try:
                 os.remove(local)
             except OSError:
                 pass
+
+
+def _cache_path(url: str) -> str:
+    digest = hashlib.md5(url.encode()).hexdigest()
+    suffix = os.path.splitext(url.split("?")[0])[1][:8] or ".jpg"
+    cache_dir = os.path.join(getattr(Config, "DOWN_PATH", "downloads/"), ".alive_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, digest + suffix)
+
+
+async def _download_cached(url: str) -> tuple:
+    """Download a URL, reusing a disk cache. Returns (path_or_None, own_tmp)."""
+    path = _cache_path(url)
+    if os.path.isfile(path) and os.path.getsize(path) > 0:
+        return path, False
+    tmp = await _download_temp(url)
+    if tmp:
+        try:
+            os.replace(tmp, path)
+            return path, False
+        except OSError:
+            return tmp, True
+    return None, False
 
 
 async def _download_temp(url: str) -> str | None:
