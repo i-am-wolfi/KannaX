@@ -10,6 +10,26 @@ _TELEGRAPH_UPLOAD_URL = "https://telegra.ph/upload"
 _CATBOX_UPLOAD_URL = "https://catbox.moe/user/api.php"
 _ZER0X_UPLOAD_URL = "https://0x0.st"
 
+_BROWSER_UA = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+}
+
+
+def _url_has_content(url: str) -> bool:
+    """Check the uploaded URL actually holds data (non-zero length)."""
+    try:
+        resp = requests.get(url, headers=_BROWSER_UA, timeout=60, stream=True)
+        resp.raise_for_status()
+        total = resp.headers.get("Content-Length")
+        if total is not None:
+            return int(total) > 0
+        # no length header: peek first chunk
+        for chunk in resp.iter_content(65536):
+            return len(chunk) > 0
+        return False
+    except Exception:
+        return False
+
 
 def _upload_catbox(dl_loc: str) -> str:
     """Upload to catbox.moe. Returns the full file URL."""
@@ -166,11 +186,18 @@ async def upload_media_(message: Message):
     if not dl_loc:
         await message.err("falha no download: arquivo vazio.")
         return None
-    await message.edit("`fazendo upload no telegraph...`")
+    try:
+        if os.path.getsize(dl_loc) == 0:
+            await message.err("falha no download: arquivo veio vazio (0 bytes). Tente outra midia.")
+            return None
+    except OSError as size_e:
+        await message.err(f"falha no download: `{size_e}`")
+        return None
+    await message.edit("`fazendo upload...`")
     try:
         response = _telegraph_upload(dl_loc)
     except Exception as t_e:
-        await message.err(f"falha no upload p/ telegraph: `{t_e}`")
+        await message.err(f"falha no upload: `{t_e}`")
         return None
     finally:
         try:
@@ -178,6 +205,13 @@ async def upload_media_(message: Message):
         except OSError:
             pass
     if not response:
-        await message.err("telegraph retornou resposta vazia.")
+        await message.err("upload retornou resposta vazia.")
+        return None
+    url = response if response.startswith("http") else f"https://telegra.ph{response}"
+    if not _url_has_content(url):
+        await message.err(
+            "o host retornou um arquivo vazio (0 bytes). "
+            "Tente outra midia ou outro formato."
+        )
         return None
     return response

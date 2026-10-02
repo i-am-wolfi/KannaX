@@ -209,7 +209,11 @@ async def _download_cached(url: str) -> tuple:
 async def _download_temp(url: str) -> str | None:
     """Download a URL to a temp file. Returns path or None."""
     try:
-        resp = requests.get(url, timeout=60)
+        resp = requests.get(
+            url,
+            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"},
+            timeout=60,
+        )
         resp.raise_for_status()
         suffix = os.path.splitext(url.split("?")[0])[1][:8] or ".jpg"
         fd, path = tempfile.mkstemp(suffix=suffix)
