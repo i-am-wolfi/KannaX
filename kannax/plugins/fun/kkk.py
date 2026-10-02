@@ -10,14 +10,14 @@ from kannax import Message, kannax
 
 
 @kannax.on_cmd(
-    "kkk",
+    "k",
     about={
-        "header": "Risada KKK animada",
+        "header": "Risada K animada",
         "description": "Manda K e edita adicionando um K por vez até 20.",
-        "usage": "{tr}kkk [letra]",
+        "usage": "{tr}k [letra]",
     },
 )
-async def kkk_(message: Message):
+async def k_(message: Message):
     """K KK KKK ..."""
     letter = (message.input_str or "K").strip().split()[0][:1].upper() or "K"
     text = ""
