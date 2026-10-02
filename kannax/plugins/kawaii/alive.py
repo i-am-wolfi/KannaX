@@ -9,7 +9,7 @@ import tempfile
 import requests
 
 from kannax import Config, Message, get_collection, kannax, get_version
-from kannax.utils import rand_array
+from kannax.utils import get_file_id, rand_array
 from kannax.plugins.bot.ialive import Bot_Alive 
 from kannax.versions import __python_version__
 from kannax.plugins.utils.telegraph import upload_media_
@@ -62,17 +62,32 @@ async def ani_save_media_alive(message: Message):
     replied = message.reply_to_message
     if not replied:
         return await message.err("`Responda a uma foto/gif/video para definir uma Alive Media.`")
+    # Telegram file_id first: ,alive sends by file_id (instant, no
+    # external host). URL upload is best-effort legacy compat.
+    fid = get_file_id(replied)
+    if not fid:
+        return await message.err("`Responda a uma foto/gif/video para definir uma Alive Media.`")
+    ftype = _reply_media_type(replied)
     link_ = await upload_media_(message)
-    if not link_:
-        return await message.edit(
-            "`setalive falhou: veja o erro acima. Responda a uma foto/gif/video de ate 5MB.`",
-            del_in=10,
-        )
-    media = link_ if link_.startswith("http") else f"https://telegra.ph{link_}"
-    await SAVED.update_one(
-            {"_id": "ALIVE_MEDIA"}, {"$set": {"link": media}}, upsert=True
-        )
-    await message.edit("`Alive Media definida com sucesso!`", del_in=5, log=True)
+    if link_ and not link_.startswith("http"):
+        link_ = f"https://telegra.ph{link_}"
+    doc = {"file_id": fid, "ftype": ftype}
+    if link_:
+        doc["link"] = link_
+    await SAVED.update_one({"_id": "ALIVE_MEDIA"}, {"$set": doc}, upsert=True)
+    extra = "" if link_ else " (sem URL espelho: hosts externos falharam, mas o alive funciona via Telegram)"
+    await message.edit(f"`Alive Media definida com sucesso!`{extra}", del_in=5, log=True)
+
+
+def _reply_media_type(replied) -> str:
+    if getattr(replied, "animation", None) or (
+        getattr(replied, "video", None)
+        and str(getattr(getattr(replied, "video", None), "file_name", "") or "").endswith((".mp4", ".mkv"))
+    ):
+        return "animation"
+    if getattr(replied, "sticker", None):
+        return "sticker"
+    return "photo"
 
 
 @kannax.on_cmd(
@@ -108,9 +123,8 @@ async def view_del_ani(message: Message):
     """new alive"""
     _findpma = await SAVED.find_one({"_id": "ALIVE_MEDIA"})
     _findamsg = await SAVED.find_one({"_id": "ALIVE_MSG"})
-    media = (_findpma.get("link") if _findpma else None) or getattr(
-        Config, "ALIVE_MEDIA", None
-    )
+    saved = _findpma or {}
+    media = saved.get("link") or getattr(Config, "ALIVE_MEDIA", None)
     if _findamsg is None:
         mmsg = rand_array(FRASES)
     else:
@@ -128,20 +142,34 @@ async def view_del_ani(message: Message):
 
     ✨ [sᴜᴘᴏʀᴛᴇ ](https://t.me/fnixsup) | 👾 [ʀᴇᴘᴏ](https://github.com/fnixdev/Kanna-X)
 """
-    await _send_alive_media(message, media, alive_msg)
+    await _send_alive_media(
+        message,
+        media,
+        alive_msg,
+        file_id=saved.get("file_id"),
+        ftype=saved.get("ftype", "photo"),
+    )
     await message.delete()
 
 
-async def _send_alive_media(message: Message, media: str, caption: str) -> None:
+async def _send_alive_media(
+    message: Message, media: str, caption: str, file_id: str | None = None, ftype: str = "photo"
+) -> None:
     """Send alive media; falls back gracefully.
 
-    1. Try the saved media (download URL locally first so Telegram
-       never has to fetch it — avoids WEBPAGE_CURL_FAILED on hosts
-       like files.catbox.moe or dead telegra.ph links).
-    2. On any failure, retry with the Config.ALIVE_MEDIA default.
+    1. Saved Telegram file_id first (instant, no external host).
+    2. Then saved/Config/default URLs (telegra.ph direct;
+       third-party hosts downloaded locally to avoid
+       WEBPAGE_CURL_FAILED).
     """
-    candidates = [m for m in (media, getattr(Config, "ALIVE_MEDIA", None), _DEFAULT_ALIVE_MEDIA) if m]
     last_err = None
+    if file_id:
+        try:
+            await _send_one_alive_media(message, file_id, caption, ftype=ftype)
+            return
+        except Exception as e:
+            last_err = e
+    candidates = [m for m in (media, getattr(Config, "ALIVE_MEDIA", None), _DEFAULT_ALIVE_MEDIA) if m]
     for cand in candidates:
         try:
             await _send_one_alive_media(message, cand, caption)
@@ -151,8 +179,13 @@ async def _send_alive_media(message: Message, media: str, caption: str) -> None:
     await message.err(f"alive falhou: `{last_err}`")
 
 
-async def _send_one_alive_media(message: Message, media: str, caption: str) -> None:
-    is_anim = (media or "").lower().split("?")[0].endswith((".gif", ".mp4"))
+async def _send_one_alive_media(
+    message: Message, media: str, caption: str, ftype: str | None = None
+) -> None:
+    if ftype == "sticker":
+        await message.client.send_sticker(chat_id=message.chat.id, sticker=media)
+        return
+    is_anim = ftype == "animation" if ftype else (media or "").lower().split("?")[0].endswith((".gif", ".mp4"))
     local = None
     own_tmp = False
     if media.startswith("http") and "telegra.ph" not in media:
