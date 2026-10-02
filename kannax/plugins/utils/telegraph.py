@@ -142,10 +142,21 @@ async def telegraph_(message: Message):
     )
 
 
-async def upload_media_(message: Message):
+async def _say(message: Message, quiet: bool, is_err: bool, text: str):
+    """Send progress/error message unless quiet (caller reports itself)."""
+    if quiet:
+        return
+    if is_err:
+        await message.err(text)
+    else:
+        await message.edit(text)
+
+
+async def upload_media_(message: Message, quiet: bool = False):
     replied = message.reply_to_message
     if not replied:
-        await message.err("responda a uma foto/gif/video.")
+        if not quiet:
+            await _say(message, quiet, True, "responda a uma foto/gif/video.")
         return None
     photo = getattr(replied, "photo", None)
     animation = getattr(replied, "animation", None)
@@ -170,9 +181,9 @@ async def upload_media_(message: Message):
         )
         or (getattr(replied, "sticker", None) is not None)
     ):
-        await message.err("midia nao suportada! responda a foto/gif/video de ate 5MB.")
+        await _say(message, quiet, True, "midia nao suportada! responda a foto/gif/video de ate 5MB.")
         return None
-    await message.edit("`processando...`")
+    await _say(message, quiet, False, "`processando...`")
     try:
         dl_loc = await message.client.download_media(
             message=message.reply_to_message,
@@ -181,23 +192,23 @@ async def upload_media_(message: Message):
             progress_args=(message, "tentando fazer download"),
         )
     except Exception as dl_e:
-        await message.err(f"falha no download: `{dl_e}`")
+        await _say(message, quiet, True, f"falha no download: `{dl_e}`")
         return None
     if not dl_loc:
-        await message.err("falha no download: arquivo vazio.")
+        await _say(message, quiet, True, "falha no download: arquivo vazio.")
         return None
     try:
         if os.path.getsize(dl_loc) == 0:
-            await message.err("falha no download: arquivo veio vazio (0 bytes). Tente outra midia.")
+            await _say(message, quiet, True, "falha no download: arquivo veio vazio (0 bytes). Tente outra midia.")
             return None
     except OSError as size_e:
-        await message.err(f"falha no download: `{size_e}`")
+        await _say(message, quiet, True, f"falha no download: `{size_e}`")
         return None
-    await message.edit("`fazendo upload...`")
+    await _say(message, quiet, False, "`fazendo upload...`")
     try:
         response = _telegraph_upload(dl_loc)
     except Exception as t_e:
-        await message.err(f"falha no upload: `{t_e}`")
+        await _say(message, quiet, True, f"falha no upload: `{t_e}`")
         return None
     finally:
         try:
@@ -205,11 +216,11 @@ async def upload_media_(message: Message):
         except OSError:
             pass
     if not response:
-        await message.err("upload retornou resposta vazia.")
+        await _say(message, quiet, True, "upload retornou resposta vazia.")
         return None
     url = response if response.startswith("http") else f"https://telegra.ph{response}"
     if not _url_has_content(url):
-        await message.err(
+        await _say(message, quiet, True, 
             "o host retornou um arquivo vazio (0 bytes). "
             "Tente outra midia ou outro formato."
         )

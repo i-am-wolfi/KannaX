@@ -61,16 +61,16 @@ REPO_X = InlineQueryResultArticle(
     title="Repo",
     input_message_content=InputTextMessageContent(
         "**Repositorio e ultilitarios do KannaX**"),
-    url="https://github.com/fnixdev/Kanna-X",
+    url="https://github.com/i-am-wolfi/KannaX",
     description="Configure o seu próprio",
     thumb_url="https://telegra.ph//file/c6d95e3f661dc15bf0df7.jpg",
     reply_markup=InlineKeyboardMarkup(
         [
             [
                 InlineKeyboardButton(
-                    "✨ Repo", url="https://github.com/fnixdev/Kanna-X"),
+                    "✨ Repo", url="https://github.com/i-am-wolfi/KannaX"),
                 InlineKeyboardButton(
-                    "📦 Instalar", url="https://heroku.com/deploy?template=https://github.com/fnixdev/deploy-x"),
+                    "📦 Instalar", url="https://heroku.com/deploy?template=https://github.com/i-am-wolfi/KannaX"),
             ],
         ]
     )
@@ -790,9 +790,9 @@ if kannax.has_bot:
                 buttons = [
                     [
                         InlineKeyboardButton(
-                            "✨ Repo", url="https://github.com/fnixdev/Kanna-X"),
+                            "✨ Repo", url="https://github.com/i-am-wolfi/KannaX"),
                         InlineKeyboardButton(
-                            "📦 Instalar", url="https://heroku.com/deploy?template=https://github.com/fnixdev/deploy-x"),
+                            "📦 Instalar", url="https://heroku.com/deploy?template=https://github.com/i-am-wolfi/KannaX"),
                     ],
                 ]
                 results.append(
@@ -1145,7 +1145,7 @@ if kannax.has_bot:
             MAIN_MENU = InlineQueryResultArticle(
                 title="Abrir menu inline",
                 input_message_content=InputTextMessageContent(" 𝐤𝐚𝐧𝐧𝐚𝐱 𝐦𝐞𝐧𝐮 "),
-                url="https://github.com/fnixdev/Kanna-X",
+                url="https://github.com/i-am-wolfi/KannaX",
                 description="KannaX Menu",
                 thumb_url="https://telegra.ph/file/d768df44c2d9b02e0f0ca.jpg",
                 reply_markup=InlineKeyboardMarkup(main_menu_buttons()),

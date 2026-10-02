@@ -68,7 +68,7 @@ async def ani_save_media_alive(message: Message):
     if not fid:
         return await message.err("`Responda a uma foto/gif/video para definir uma Alive Media.`")
     ftype = _reply_media_type(replied)
-    link_ = await upload_media_(message)
+    link_ = await upload_media_(message, quiet=True)
     if link_ and not link_.startswith("http"):
         link_ = f"https://telegra.ph{link_}"
     doc = {"file_id": fid, "ftype": ftype}
@@ -140,7 +140,7 @@ async def view_del_ani(message: Message):
 • **Bot Version**  :  `v{get_version()}`
 • **Python Version**  :  `v{__python_version__}`
 
-    ✨ [sᴜᴘᴏʀᴛᴇ ](https://t.me/fnixsup) | 👾 [ʀᴇᴘᴏ](https://github.com/fnixdev/Kanna-X)
+    ✨ [sᴜᴘᴏʀᴛᴇ ](https://t.me/WolfRedicopa) | 👾 [ʀᴇᴘᴏ](https://github.com/i-am-wolfi/KannaX) | ᴄʀɪᴀᴅᴏʀ ᴏʀɪɢɪɴᴀʟ: [fnixdev](https://github.com/fnixdev)
 """
     await _send_alive_media(
         message,
