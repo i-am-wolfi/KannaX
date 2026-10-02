@@ -56,7 +56,10 @@ async def ani_save_media_alive(message: Message):
         return await message.err("`Responda a uma foto/gif/video para definir uma Alive Media.`")
     link_ = await upload_media_(message)
     if not link_:
-        return
+        return await message.edit(
+            "`setalive falhou: veja o erro acima. Responda a uma foto/gif/video de ate 5MB.`",
+            del_in=10,
+        )
     media = f"https://telegra.ph{link_}"
     await SAVED.update_one(
             {"_id": "ALIVE_MEDIA"}, {"$set": {"link": media}}, upsert=True

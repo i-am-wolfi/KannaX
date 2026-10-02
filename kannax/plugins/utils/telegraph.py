@@ -32,36 +32,60 @@ async def telegraph_(message: Message):
 
 async def upload_media_(message: Message):
     replied = message.reply_to_message
+    if not replied:
+        await message.err("responda a uma foto/gif/video.")
+        return None
+    photo = getattr(replied, "photo", None)
+    animation = getattr(replied, "animation", None)
+    video = getattr(replied, "video", None)
+    document = getattr(replied, "document", None)
+    doc_name = str(getattr(document, "file_name", "") or "")
+    vid_name = str(getattr(video, "file_name", "") or "")
     if not (
-        (replied.photo and replied.photo.file_size <= _T_LIMIT)
-        or (replied.animation and replied.animation.file_size <= _T_LIMIT)
+        (photo and (photo.file_size or 0) <= _T_LIMIT)
+        or (animation and (animation.file_size or 0) <= _T_LIMIT)
         or (
-            replied.video
-            and replied.video.file_name.endswith((".mp4", ".mkv"))
-            and replied.video.file_size <= _T_LIMIT
+            video
+            and vid_name.endswith((".mp4", ".mkv"))
+            and (video.file_size or 0) <= _T_LIMIT
         )
         or (
-            replied.document
-            and replied.document.file_name.endswith(
+            document
+            and doc_name.endswith(
                 (".jpg", ".jpeg", ".png", ".gif", ".mp4", ".mkv")
             )
-            and replied.document.file_size <= _T_LIMIT
+            and (document.file_size or 0) <= _T_LIMIT
         )
+        or (getattr(replied, "sticker", None) is not None)
     ):
-        await message.err("not supported!")
-        return
+        await message.err("midia nao suportada! responda a foto/gif/video de ate 5MB.")
+        return None
     await message.edit("`processando...`")
-    dl_loc = await message.client.download_media(
-        message=message.reply_to_message,
-        file_name=Config.DOWN_PATH,
-        progress=progress,
-        progress_args=(message, "tentando fazer download"),
-    )
+    try:
+        dl_loc = await message.client.download_media(
+            message=message.reply_to_message,
+            file_name=Config.DOWN_PATH,
+            progress=progress,
+            progress_args=(message, "tentando fazer download"),
+        )
+    except Exception as dl_e:
+        await message.err(f"falha no download: `{dl_e}`")
+        return None
+    if not dl_loc:
+        await message.err("falha no download: arquivo vazio.")
+        return None
     await message.edit("`fazendo upload no telegraph...`")
     try:
         response = upload_file(dl_loc)
     except Exception as t_e:
-        await message.err(t_e)
-        return
-    os.remove(dl_loc)
+        await message.err(f"falha no upload p/ telegraph: `{t_e}`")
+        return None
+    finally:
+        try:
+            os.remove(dl_loc)
+        except OSError:
+            pass
+    if not response:
+        await message.err("telegraph retornou resposta vazia.")
+        return None
     return str(response[0])
