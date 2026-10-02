@@ -60,7 +60,7 @@ async def ani_save_media_alive(message: Message):
             "`setalive falhou: veja o erro acima. Responda a uma foto/gif/video de ate 5MB.`",
             del_in=10,
         )
-    media = f"https://telegra.ph{link_}"
+    media = link_ if link_.startswith("http") else f"https://telegra.ph{link_}"
     await SAVED.update_one(
             {"_id": "ALIVE_MEDIA"}, {"$set": {"link": media}}, upsert=True
         )

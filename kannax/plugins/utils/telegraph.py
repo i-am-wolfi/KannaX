@@ -7,17 +7,67 @@ from kannax.utils import progress
 
 _T_LIMIT = 5242880
 _TELEGRAPH_UPLOAD_URL = "https://telegra.ph/upload"
+_CATBOX_UPLOAD_URL = "https://catbox.moe/user/api.php"
+_ZER0X_UPLOAD_URL = "https://0x0.st"
+
+
+def _upload_catbox(dl_loc: str) -> str:
+    """Upload to catbox.moe. Returns the full file URL."""
+    fname = os.path.basename(dl_loc)
+    with open(dl_loc, "rb") as f:
+        resp = requests.post(
+            _CATBOX_UPLOAD_URL,
+            data={"reqtype": "fileupload"},
+            files={"fileToUpload": (fname, f)},
+            timeout=120,
+        )
+    resp.raise_for_status()
+    url = resp.text.strip()
+    if not url.startswith("http"):
+        raise RuntimeError(f"catbox: unexpected response {url!r}")
+    return url
+
+
+def _upload_zer0x(dl_loc: str) -> str:
+    """Upload to 0x0.st. Returns the full file URL."""
+    fname = os.path.basename(dl_loc)
+    with open(dl_loc, "rb") as f:
+        resp = requests.post(
+            _ZER0X_UPLOAD_URL,
+            files={"file": (fname, f)},
+            timeout=120,
+        )
+    resp.raise_for_status()
+    url = resp.text.strip()
+    if not url.startswith("http"):
+        raise RuntimeError(f"0x0.st: unexpected response {url!r}")
+    return url
 
 
 def _telegraph_upload(dl_loc: str) -> str:
-    """Upload a file to telegra.ph without the broken `telegraph` lib wrapper.
+    """Upload a file and return a direct URL.
 
-    The lib's TelegraphApi.upload_file() does response[0].get('error'),
-    but telegra.ph now returns a plain list of path strings
-    (e.g. ["/file/abc.jpg"]), so every upload crashed with
-    "'str' object has no attribute 'get'". Posting directly and
-    accepting both response shapes fixes setalive/telegraph.
+    Tries catbox.moe first, then 0x0.st, then telegra.ph.
+    (telegra.ph /upload currently answers 400 "Unknown error" to
+    everything, and the `telegraph` lib wrapper is broken on top of
+    that — it does response[0].get('error') while the API returns a
+    plain list of strings. So telegraph is last resort.)
+    Returns a full URL (catbox/0x0) or a telegra.ph path.
     """
+    errors = []
+    for name, func in (
+        ("catbox", _upload_catbox),
+        ("0x0.st", _upload_zer0x),
+        ("telegraph", _upload_telegraph),
+    ):
+        try:
+            return func(dl_loc)
+        except Exception as e:
+            errors.append(f"{name}: {e}")
+    raise RuntimeError("all upload hosts failed (" + "; ".join(errors) + ")")
+
+
+def _upload_telegraph(dl_loc: str) -> str:
     with open(dl_loc, "rb") as f:
         resp = requests.post(
             _TELEGRAPH_UPLOAD_URL,
@@ -65,8 +115,9 @@ async def telegraph_(message: Message):
     link = await upload_media_(message)
     if not link:
         return
+    url = link if link.startswith("http") else f"https://telegra.ph{link}"
     await message.edit(
-        f"**[Aqui, seu link Telegra.ph!](https://telegra.ph{link})**",
+        f"**[Aqui, seu link!]({url})**",
         disable_web_page_preview=True,
     )
 
