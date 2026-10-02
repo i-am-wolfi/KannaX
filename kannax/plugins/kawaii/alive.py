@@ -33,6 +33,16 @@ async def _init():
         },
     },
 )
+@kannax.on_cmd(
+    "setalive",
+    about={
+        "header": "Set alive media (alias)",
+        "description": "Alias de setamedia: responda a uma foto/gif/video para definir a Alive Media",
+        "flags": {
+            "-r": "reset alive media.",
+        },
+    },
+)
 async def ani_save_media_alive(message: Message):
     """set media alive"""
     found = await SAVED.find_one({"_id": "ALIVE_MEDIA"})
@@ -45,6 +55,8 @@ async def ani_save_media_alive(message: Message):
     if not replied:
         return await message.err("`Responda a uma foto/gif/video para definir uma Alive Media.`")
     link_ = await upload_media_(message)
+    if not link_:
+        return
     media = f"https://telegra.ph{link_}"
     await SAVED.update_one(
             {"_id": "ALIVE_MEDIA"}, {"$set": {"link": media}}, upsert=True
