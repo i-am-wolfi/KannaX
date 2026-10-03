@@ -119,6 +119,14 @@ def _get_spec(url: str, row: str) -> str:
     if row == "name":
         return name
     if row == "all":
+        import re as _re
+
+        hl = {}
+        # highlight header carries battery size even when the table lacks it
+        m = _re.search(r'data-spec="batsize-hl">([^<]+)', resp.text)
+        if m:
+            hl["batsize"] = m.group(1).strip()
+        specs["_hl"] = hl
         return specs  # type: ignore[return-value]
     sec, ttl = row.split("|", 1)
     return picked.get((sec, ttl), "")
@@ -137,6 +145,23 @@ def _fmt_specs(name: str, url: str, specs: dict) -> str:
                 return v
         rows = specs.get(sec, [])
         return rows[0][1] if rows else ""
+
+    def batt(specs):
+        rows = specs.get("Battery", [])
+        for t, v in rows:
+            if "mah" in v.lower():
+                return v
+        size = specs.get("_hl", {}).get("batsize", "")
+        if size:
+            size = size if "mah" in size.lower() else f"{size} mAh"
+            for t, v in rows:
+                if t.lower() == "type" and v:
+                    return v if "mah" in v.lower() else f"{size} ({v})"
+            return size
+        for t, v in rows:
+            if t.lower() == "type" and v:
+                return v
+        return ""
 
     def block(*vals):
         return "\n".join(v for v in vals if v)
@@ -157,11 +182,18 @@ def _fmt_specs(name: str, url: str, specs: dict) -> str:
         ("3.5mm jack", g("Sound", "3.5mm jack")),
         ("USB", g("Comms", "USB")),
         ("Sensors", g("Features", "Sensors") or first("Features")),
-        ("Battery", g("Battery", "Type") or first("Battery", skip=())),
+        ("Battery", batt(specs)),
     ]
     lines = [f"[{name}]({url})", ""]
-    lines += [f"**{label}:** {val}" if "\n" not in val else f"**{label}:**\n{val}" for label, val in rows if val]
-    return "\n".join(lines)
+    for label, val in rows:
+        if not val:
+            continue
+        if "\n" in val:
+            lines.append(f"**{label}:**\n{val}")
+        else:
+            lines.append(f"**{label}:** {val}")
+        lines.append("")
+    return "\n".join(lines).rstrip()
 
 
 @kannax.on_cmd(
