@@ -31,18 +31,37 @@ async def ln_user_(message: Message):
             except YouBlockedUser:
                 await message.err(f"Desbloqueie {bot_} primeiro...", del_in=5)
                 return
+            # bots often reply with several messages ("searching..." then
+            # the result); collect follow-ups and keep the longest text
+            # instead of blindly showing the first one.
+            candidates = []
             try:
-                response = await conv.get_response(mark_read=True)
+                first = await conv.get_response(mark_read=True)
+                if first is not None:
+                    candidates.append(first)
             except asyncio.TimeoutError:
+                pass
+            for _ in range(3):
+                try:
+                    nxt = await conv.get_response(timeout=8, mark_read=True)
+                    if nxt is None:
+                        break
+                    candidates.append(nxt)
+                except (asyncio.TimeoutError, Exception):
+                    break
+            if not candidates:
                 await message.edit(
-                    f"{bot_} não respondeu em 30s. Tente novamente.", del_in=5
+                    f"{bot_} não respondeu em 30s. "
+                    f"Abra {bot_} e mande /start uma vez, depois tente de novo.",
+                    del_in=10,
                 )
                 return
-            if response is None:
-                await message.edit(
-                    f"{bot_} não retornou resposta. Tente novamente.", del_in=5
-                )
-                return
+            response = max(
+                candidates,
+                key=lambda m: len(
+                    getattr(m, "text", None) or getattr(m, "caption", None) or ""
+                ),
+            )
     except StopConversation as sc_e:
         if "already started" in str(sc_e):
             await message.edit(
