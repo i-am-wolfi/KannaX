@@ -14,8 +14,6 @@ import os
 import sys
 import signal
 
-import psutil
-
 from kannax import logging
 from ...ext import RawClient
 
@@ -37,11 +35,11 @@ class Restart(RawClient):  # pylint: disable=missing-class-docstring
         if hard:
             os.kill(os.getpid(), signal.SIGUSR1)
         else:
-            try:
-                c_p = psutil.Process(os.getpid())
-                for handler in c_p.open_files() + c_p.connections():
-                    os.close(handler.fd)
-            except Exception as c_e:  # pylint: disable=broad-except
-                print(_LOG_STR % c_e)
+            # NOTE: do NOT close fds here (the old psutil loop closed
+            # stdout/stderr/log fds, so the execl'd process died silently
+            # during plugin import and ,restart never came back).
+            # stop() above already disconnects clients cleanly.
+            sys.stdout.flush()
+            sys.stderr.flush()
             os.execl(sys.executable, sys.executable, '-m', 'kannax')  # nosec
             sys.exit()
