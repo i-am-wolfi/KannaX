@@ -138,21 +138,29 @@ def _fmt_specs(name: str, url: str, specs: dict) -> str:
         rows = specs.get(sec, [])
         return rows[0][1] if rows else ""
 
-    res = g("Display", "Resolution").split(",")[0]
+    def block(*vals):
+        return "\n".join(v for v in vals if v)
+
+    disp = block(g("Display", "Type"), g("Display", "Size"), g("Display", "Resolution"))
+    chip = block(g("Platform", "Chipset"), g("Platform", "CPU"), g("Platform", "GPU"))
+    rear = (g("Main Camera", "Quad") or g("Main Camera", "Triple") or g("Main Camera", "Dual") or g("Main Camera", "Single") or first("Main Camera"))
+    front = (g("Selfie camera", "Single") or first("Selfie camera"))
     rows = [
-        ("🖥 Tela", " | ".join(v for v in (g("Display", "Size").split(",")[0], g("Display", "Type"), res) if v)),
-        ("⚙ Chip", g("Platform", "Chipset")),
-        ("🧠 RAM/ROM", g("Memory", "Internal")),
-        ("📷 Traseira", g("Main Camera", "Triple") or g("Main Camera", "Dual") or g("Main Camera", "Single") or g("Main Camera", "Quad") or first("Main Camera")),
-        ("🤳 Frontal", g("Selfie camera", "Single") or first("Selfie camera")),
-        ("🔋 Bateria", g("Battery", "Type") or first("Battery", skip=())),
-        ("📏 Corpo", " | ".join(v for v in (g("Body", "Dimensions"), g("Body", "Weight")) if v)),
-        ("📅 Lançado", " | ".join(v for v in (g("Launch", "Announced"), g("Launch", "Status")) if v)),
-        ("🎨 Cores", g("Misc", "Colors")),
+        ("Status", g("Launch", "Status")),
+        ("Network", g("Network", "Technology") or first("Network")),
+        ("Weight", g("Body", "Weight")),
+        ("Display", disp),
+        ("Chipset", chip),
+        ("Memory", g("Memory", "Internal")),
+        ("Rear Camera", rear),
+        ("Front Camera", front),
+        ("3.5mm jack", g("Sound", "3.5mm jack")),
+        ("USB", g("Comms", "USB")),
+        ("Sensors", g("Features", "Sensors") or first("Features")),
+        ("Battery", g("Battery", "Type") or first("Battery", skip=())),
     ]
-    lines = [f"📱 **{name}**", ""]
-    lines += [f"**{label}:** {val}" for label, val in rows if val]
-    lines += ["", f"🔗 [Ficha completa]({url})"]
+    lines = [f"[{name}]({url})", ""]
+    lines += [f"**{label}:** {val}" if "\n" not in val else f"**{label}:**\n{val}" for label, val in rows if val]
     return "\n".join(lines)
 
 
