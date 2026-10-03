@@ -14,17 +14,26 @@ info(){ echo "ℹ️  $*"; }
 command -v pkg >/dev/null 2>&1 || die "comando 'pkg' não encontrado."
 
 # 1. pacotes do sistema ----------------------------------------------------
+# Deps Python com build nativo pesado: usa os pacotes PRÉ-COMPILADOS do
+# Termux (python-*) em vez de compilar via pip — pip tentando compilar
+# por cima desses quebra. A venv abaixo usa --system-site-packages para
+# enxergá-los, e o pip os considera satisfeitos.
+PKG_PYTHON_DEPS="python-numpy python-pillow python-lxml python-psutil"
+
 info "atualizando pacotes..."
 pkg update -y || die "falha no pkg update"
 
 info "instalando dependências do sistema..."
 pkg install -y python git ffmpeg jq curl tmux libjpeg-turbo zlib openssl clang \
+    $PKG_PYTHON_DEPS \
     || die "falha no pkg install"
 
 # 2. venv ------------------------------------------------------------------
+# --system-site-packages: enxerga os python-* instalados via pkg acima,
+# então o pip não tenta recompilar numpy/Pillow/lxml/psutil.
 if [[ ! -x .venv/bin/python ]]; then
-    info "criando venv..."
-    python -m venv .venv || die "falha ao criar venv"
+    info "criando venv (com acesso aos pacotes do sistema)..."
+    python -m venv --system-site-packages .venv || die "falha ao criar venv"
     ok "venv criada"
 else
     ok "venv já existe"

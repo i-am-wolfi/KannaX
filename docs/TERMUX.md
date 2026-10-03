@@ -7,6 +7,8 @@ Testado como alvo: Android ARM64, Termux do F-Droid (não use a versão da Play 
 ```bash
 pkg update -y
 pkg install -y python git ffmpeg jq curl tmux libjpeg-turbo zlib openssl
+# pré-compilados do Termux (evitam compilar via pip, que quebra):
+pkg install -y python-numpy python-pillow python-lxml python-psutil
 ```
 
 > `tgcrypto` foi removido do `requirements-termux.txt` (não compila bem no
@@ -19,7 +21,7 @@ pkg install -y python git ffmpeg jq curl tmux libjpeg-turbo zlib openssl
 ```bash
 git clone https://github.com/i-am-wolfi/KannaX
 cd KannaX
-python -m venv .venv
+python -m venv --system-site-packages .venv   # enxerga os python-* do pkg
 source .venv/bin/activate
 pip install --upgrade pip
 pip install -r requirements-termux.txt
