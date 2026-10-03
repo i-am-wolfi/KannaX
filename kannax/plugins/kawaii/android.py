@@ -77,7 +77,7 @@ async def device_recovery(message: Message):
 @kannax.on_cmd("magisk$", about={"header": "Obtenha o magisk mais recente"})
 async def magisk_(message: Message):
     """magisk mais recente"""
-    magisk_repo = "https://raw.githubusercontent.com/fnixdev/magisk-files/"
+    magisk_repo = "https://raw.githubusercontent.com/topjohnwu/magisk-files/"
     magisk_dict = {
         "⦁ 𝗦𝘁𝗮𝗯𝗹𝗲": magisk_repo + "master/stable.json",
         "⦁ 𝗕𝗲𝘁𝗮": magisk_repo + "master/beta.json",
@@ -85,19 +85,20 @@ async def magisk_(message: Message):
     }
     releases = "<code><i>Versão mais recente do magisk:</i></code>\n\n"
     for name, release_url in magisk_dict.items():
-        data = get(release_url).json()
-        if "canary" in release_url:
-            data["app"]["link"] = magisk_repo + "canary/" + data["app"]["link"]
-            data["magisk"]["link"] = magisk_repo + \
-                "canary/" + data["magisk"]["link"]
-            data["uninstaller"]["link"] = (
-                magisk_repo + "canary/" + data["uninstaller"]["link"]
-            )
-
-        releases += (
-            f'{name}: [ZIP v{data["magisk"]["version"]}]({data["magisk"]["link"]}) | '
-            f'[APK v{data["app"]["version"]}]({data["app"]["link"]}) | '
-            f'[Uninstaller]({data["uninstaller"]["link"]})\n'
-        )
+        try:
+            resp = get(release_url, timeout=30)
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            releases += f"{name}: falha ao buscar (`{e}`)\n"
+            continue
+        mg = data.get("magisk", {})
+        version = mg.get("version", "?")
+        link = mg.get("link", "")
+        note = mg.get("note", "")
+        line = f"{name}: [APK/ZIP v{version}]({link})" if link else f"{name}: v{version} (sem link)"
+        if note:
+            line += f" | [Changelog]({note})"
+        releases += line + "\n"
 
     await message.edit(releases, disable_web_page_preview=True)
