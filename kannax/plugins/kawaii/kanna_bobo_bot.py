@@ -232,7 +232,4 @@ async def gsm_device(message: Message):
         await message.edit(f"`Falha lendo a ficha: {e}`", del_in=10)
         return
     text = _fmt_specs(title or name, url, specs)
-    if len(models) > 1:
-        others = "\n".join(f"• {n}" for n, _ in models[1:4])
-        text += f"\n\n**Também achei:**\n{others}\nRefine a busca se não for esse."
     await message.edit(text, disable_web_page_preview=True)
