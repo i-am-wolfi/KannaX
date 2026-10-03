@@ -126,6 +126,9 @@ def _get_spec(url: str, row: str) -> str:
         m = _re.search(r'data-spec="batsize-hl">([^<]+)', resp.text)
         if m:
             hl["batsize"] = m.group(1).strip()
+        img = soup.select_one(".specs-photo-main img")
+        if img and img.get("src"):
+            hl["image"] = img["src"]
         specs["_hl"] = hl
         return specs  # type: ignore[return-value]
     sec, ttl = row.split("|", 1)
@@ -170,7 +173,9 @@ def _fmt_specs(name: str, url: str, specs: dict) -> str:
     chip = block(g("Platform", "Chipset"), g("Platform", "CPU"), g("Platform", "GPU"))
     rear = (g("Main Camera", "Quad") or g("Main Camera", "Triple") or g("Main Camera", "Dual") or g("Main Camera", "Single") or first("Main Camera"))
     front = (g("Selfie camera", "Single") or first("Selfie camera"))
+    img = specs.get("_hl", {}).get("image", "")
     rows = [
+        ("Foto", f"[📷 ver foto]({img})" if img else ""),
         ("Status", g("Launch", "Status")),
         ("Network", g("Network", "Technology") or first("Network")),
         ("Weight", g("Body", "Weight")),
