@@ -47,23 +47,25 @@ def _find_device(codename: str) -> dict | None:
     return (exact or partial or [None])[0]
 
 
-def _last_stable(device_id: str) -> dict | None:
+def _release_of_type(device_id: str, want: str) -> tuple:
+    """(release or None, available types). Prefers active, falls back to archived."""
     rels = _api_get("/releases", params={"device_id": device_id}).get("data", [])
     rels = [r for r in rels if r.get("device_id") == device_id]
     if not rels:
-        return None
-    # prefer active builds, but old devices only have archived ones —
-    # an archived stable download still beats nothing
-    active = [r for r in rels if not r.get("archived")] or rels
-    stable = [r for r in active if r.get("type") == "stable"] or active
-    return max(stable, key=lambda r: r.get("date", 0))
+        return None, []
+    types = sorted({r.get("type", "?") for r in rels})
+    pool = [r for r in rels if r.get("type") == want]
+    if not pool:
+        return None, types
+    active = [r for r in pool if not r.get("archived")] or pool
+    return max(active, key=lambda r: r.get("date", 0)), types
 
 
 @kannax.on_cmd(
     "ofox",
     about={
         "header": "get orangefox recovery by device codename do"
-        ".ofox codename (works in inline too)"
+        ".ofox codename [stable|beta] (works in inline too)"
     },
 )
 async def ofox_(message: Message):
@@ -71,6 +73,11 @@ async def ofox_(message: Message):
         await message.err("Provide a device codename to search recovery", del_in=2)
         return
     codename = message.input_str.strip().split()[0]
+    want = "stable"
+    parts = message.input_str.strip().split()
+    if len(parts) > 1 and parts[-1].lower() in ("stable", "beta"):
+        want = parts[-1].lower()
+        codename = parts[0]
     await message.edit("🔍 searching for recovery...", del_in=2)
     photo = "https://i.imgur.com/582uaSk.png"
     try:
@@ -82,12 +89,16 @@ async def ofox_(message: Message):
         await message.err(f"recovery not found for {codename}!", del_in=3)
         return
     try:
-        s = _last_stable(dev["id"])
+        s, available = _release_of_type(dev["id"], want)
     except Exception as e:
         await message.err(f"OrangeFox API error: `{e}`", del_in=5)
         return
     if not s:
-        await message.err(f"no releases for {dev.get('full_name', codename)}!", del_in=5)
+        await message.err(
+            f"no {want} releases for {dev.get('full_name', codename)}! "
+            f"(disponível: {', '.join(available) or 'nada'})",
+            del_in=5,
+        )
         return
     maintainer = (dev.get("maintainer") or {}).get("name", "?")
     date = datetime.datetime.fromtimestamp(s.get("date", 0)).strftime("%Y-%m-%d")
