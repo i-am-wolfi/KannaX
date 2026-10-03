@@ -24,9 +24,12 @@ info "atualizando pacotes..."
 pkg update -y || die "falha no pkg update"
 
 info "instalando dependências do sistema..."
-pkg install -y python git ffmpeg jq curl tmux libjpeg-turbo zlib openssl clang \
+pkg install -y python git jq curl tmux libjpeg-turbo zlib openssl clang \
     $PKG_PYTHON_DEPS \
     || die "falha no pkg install"
+# NOTA: ffmpeg removido temporariamente (travava a instalação no Termux).
+# Plugins de mídia que precisam dele (conversões, voice, etc.) ficam
+# degradados até reinstalar: pkg install ffmpeg
 
 # 2. venv ------------------------------------------------------------------
 # --system-site-packages: enxerga os python-* instalados via pkg acima,
