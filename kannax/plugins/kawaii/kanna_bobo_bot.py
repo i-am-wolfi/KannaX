@@ -3,6 +3,7 @@
 """puxa ficha de celular direto do gsmarena.com"""
 
 import asyncio
+import os
 import re
 
 import requests
@@ -13,30 +14,81 @@ from kannax import Message, kannax
 _UA = {
     "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
 }
-_SPEC_RE = re.compile(r"^https?://(?:www|m)\.gsmarena\.com/[a-z0-9_\-]+-\d+\.php$")
-_SKIP_RE = re.compile(r"-(pictures|review|price|vs_|compare)")
+_SITEMAP_URL = "https://www.gsmarena.com/sitemaps/phones.xml"
+_SITEMAP_TTL = 7 * 24 * 3600  # refresh weekly
+
+
+def _norm(text: str) -> list:
+    return [t for t in re.sub(r"[^a-z0-9]+", " ", text.lower()).split() if t]
+
+
+def _slug_name(url: str) -> str:
+    slug = url.rsplit("/", 1)[1][:-4]
+    slug = re.sub(r"-\d+$", "", slug)
+    return slug.replace("_", " ")
+
+
+def _sitemap_path() -> str:
+    from kannax import Config
+
+    cache_dir = os.path.join(getattr(Config, "DOWN_PATH", "downloads/"), ".gsm_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+    return os.path.join(cache_dir, "phones.xml")
+
+
+def _load_index() -> list:
+    """(name, url) for every GSM Arena phone, cached from phones.xml."""
+    import time
+
+    path = _sitemap_path()
+    fresh = os.path.isfile(path) and (time.time() - os.path.getmtime(path) < _SITEMAP_TTL)
+    if not fresh:
+        resp = requests.get(_SITEMAP_URL, headers=_UA, timeout=120)
+        resp.raise_for_status()
+        with open(path, "wb") as f:
+            f.write(resp.content)
+    with open(path, encoding="utf-8", errors="replace") as f:
+        xml = f.read()
+    index = []
+    for url in re.findall(r"<loc>(https://www\.gsmarena\.com/[a-z0-9_\-]+\.php)</loc>", xml):
+        if "-pictures-" in url:
+            continue
+        index.append((_slug_name(url), url))
+    return index
 
 
 def _search_models(query: str, limit: int = 6) -> list:
-    """Find GSM Arena spec page URLs via DuckDuckGo site: search."""
-    resp = requests.post(
-        "https://html.duckduckgo.com/html/",
-        data={"q": f"site:gsmarena.com {query} Full phone specifications"},
-        headers=_UA,
-        timeout=30,
-    )
-    resp.raise_for_status()
-    soup = BeautifulSoup(resp.content, "html.parser")
-    found = []
-    for a in soup.select("a.result__a"):
-        href = a.get("href", "")
-        title = a.get_text(" ", strip=True)
-        if _SPEC_RE.match(href) and not _SKIP_RE.search(href) and href not in found:
-            name = re.sub(r"\s*-\s*Full phone specifications.*$", "", title).strip()
-            found.append((name or href, href))
-        if len(found) >= limit:
-            break
-    return found
+    """Match query against the local GSM Arena sitemap index.
+
+    No external search engine (they throttle datacenter IPs); the
+    sitemap is cached on disk and refreshed weekly.
+    """
+    qtokens = _norm(query)
+    if not qtokens:
+        return []
+    scored = []
+    for name, url in _load_index():
+        ntokens = set(_norm(name))
+        flat = name.replace(" ", "")
+        hits, exact = 0, 0
+        for t in qtokens:
+            if t in ntokens:
+                hits += 1
+                exact += 1
+            elif len(t) > 1 and t in flat:
+                # single letters only match whole tokens, otherwise "g"
+                # would match every name containing the letter g
+                hits += 1
+        if hits == 0:
+            continue
+        # all query tokens matched wins; exact token beats substring;
+        # then fewest extra tokens; then newest id
+        extra = len(ntokens) - hits
+        m = re.search(r"-(\d+)\.php$", url)
+        pid = int(m.group(1)) if m else 0
+        scored.append((hits / len(qtokens), exact, -extra, pid, name, url))
+    scored.sort(reverse=True)
+    return [(n, u) for _, _, _, _, n, u in scored[:limit]]
 
 
 def _get_spec(url: str, row: str) -> str:
