@@ -1,0 +1,81 @@
+# Kanna-X — Termux (Android ARM64).
+# Igual ao requirements-py314.txt MENOS: tgcrypto (compilar no clang do Termux falha/demora; pyrogram usa fallback puro), selenium (sem Chrome no Termux), opencv-python-headless e scikit-image (build pesado).
+# Kanna-X — dependências adaptadas para Python 3.10+ / 3.14 (Arch)
+# Baseado no requirements.txt original (2021). Mudanças vs original:
+# - Pillow==8.2.0 -> Pillow>=10 (8.x não compila no Python 3.11+)
+# - opencv-python -> opencv-python-headless (sem dependências de GUI/X)
+# - selenium==3.141.0 -> selenium>=4 (3.x não instala no 3.14; call sites
+#   com chrome_options= foram corrigidos para options=)
+# - googletrans==3.1.0a0 -> googletrans>=4 (3.1.0a0 não instala no 3.14)
+# - youtube-search-python==1.4.2 -> >=1.6.6 (1.4.2 não instala; plugin
+#   kawaii/youtube.py adaptado para a API nova VideosSearch)
+# - git+https://github.com/fnixdev/search-engine-parser -> pacote oficial PyPI
+# - git+https://github.com/fnixdev/sqlalchemy -> sqlalchemy oficial
+# - git+https://github.com/ytdl-org/youtube-dl -> yt-dlp (com shim de
+#   compatibilidade youtube_dl/ criado pelo setup-kanna.sh)
+# - REMOVIDOS (repos mortos, plugins afetados ficam desativados com aviso):
+#     Async-nekos.life-wrapper (fun/nekos.py), google-images-download
+#     (misc/google_img.py)
+# - pyrogram mantido em 1.4.16 (código do Kanna-X foi escrito para essa API)
+#   + shim asyncio para Python 3.10+ (tools/py314/sitecustomize.py)
+
+aiofiles>=0.6.0
+aiohttp[speedups]>=3.7.3
+asyncurban>=0.3.3
+beautifulsoup4>=4.9.1
+covid>=2.4.0
+cowpy>=1.1.0
+dnspython>=2.0.0
+gitpython>=3.1.11
+gdshortener
+pyTelegramBotAPI
+google-api-python-client>=1.12.8
+google-auth-httplib2>=0.0.4
+google-auth-oauthlib>=0.4.2
+googletrans>=4.0.0
+hachoir>=3.1.1
+heroku3>=4.2.3
+# (html-telegraph-poster precisa de lxml_html_clean com lxml>=5)
+html-telegraph-poster>=0.2.31
+lxml>=6.0.0
+lxml_html_clean>=0.2.0
+imutils
+motor>=2.3.0
+numpy
+oauth2client>=4.1.3
+Pillow>=10.0.0
+psutil>=5.7.3
+pybase64>=1.1.1
+pyrogram==1.4.16
+pySmartDL>=1.3.4
+python-dotenv>=0.15.0
+pytz>=2020.4
+pytube
+rarfile>=4.0
+removebg>=0.4
+requests>=2.25.0
+search-engine-parser>=0.6.0
+setuptools>=40.3.0
+spamwatch>=0.3.0
+speedtest-cli>=2.1.3
+stagger>=1.0.0
+spotipy
+telegraph>=1.4.1
+sqlalchemy>=1.4
+pickledb
+urbandict>=0.5
+wget>=3.2
+wikipedia>=1.4.0
+yt-dlp
+ruamel.yaml>=0.17.2
+python-rapidjson>=1.4
+ujson>=4.0.1
+youtube-search-python>=1.6.6
+feedparser>=6.0.2
+# Deps de plugins (core + xtra) que faltavam no requirements original
+validators>=0.22.0
+colour>=0.1.5
+gtts>=2.4.0
+justwatch>=0.5.1
+flag>=0.1.0
+glitch_this>=1.0.3
