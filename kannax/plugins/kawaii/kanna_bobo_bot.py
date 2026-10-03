@@ -56,12 +56,14 @@ async def ln_user_(message: Message):
                     del_in=10,
                 )
                 return
-            response = max(
-                candidates,
-                key=lambda m: len(
-                    getattr(m, "text", None) or getattr(m, "caption", None) or ""
-                ),
-            )
+            def _score(m):
+                mk = getattr(m, "reply_markup", None)
+                if mk and getattr(mk, "inline_keyboard", None):
+                    return (1, 0)  # device picker buttons win over plain text
+                t = getattr(m, "text", None) or getattr(m, "caption", None) or ""
+                return (0, len(t))
+
+            response = max(candidates, key=_score)
     except StopConversation as sc_e:
         if "already started" in str(sc_e):
             await message.edit(
@@ -79,8 +81,22 @@ async def ln_user_(message: Message):
         await message.edit(f"<b>ERRO:</b> <code>{e}</code>")
         return
     text = getattr(response, "text", None) or getattr(response, "caption", None)
+    markup = getattr(response, "reply_markup", None)
+    if markup and getattr(markup, "inline_keyboard", None):
+        # multiple devices: bot sent buttons to pick one. Forward it
+        # (forward keeps buttons working; a copy would kill callbacks).
+        # The user taps the phone they want right in the chat.
+        try:
+            await response.forward(chat_id=message.chat.id)
+            await message.delete()
+        except Exception as fwd_e:
+            await message.edit(
+                f"Encontrei opções mas não consegui encaminhar: `{fwd_e}`",
+                del_in=10,
+            )
+        return
     if not text:
-        # media/sticker/button-only reply: forward the bot message itself
+        # media/sticker reply: copy the bot message itself
         # so the result still reaches the chat
         try:
             await response.copy(chat_id=message.chat.id)
