@@ -150,10 +150,10 @@ def _get_spec(url: str, row: str) -> str:
         import re as _re
 
         hl = {}
-        # highlight header carries battery size even when the table lacks it
-        m = _re.search(r'data-spec="batsize-hl">([^<]+)', resp.text)
-        if m:
-            hl["batsize"] = m.group(1).strip()
+        for k, v in _re.findall(r'data-spec="([a-z0-9\-]+)"[^>]*>([^<]{0,200})', resp.text):
+            v = v.strip()
+            if v and k not in hl:
+                hl[k] = v
         img = soup.select_one(".specs-photo-main img")
         if img and img.get("src"):
             hl["image"] = img["src"]
@@ -177,44 +177,33 @@ def _fmt_specs(name: str, url: str, specs: dict) -> str:
         rows = specs.get(sec, [])
         return rows[0][1] if rows else ""
 
-    def batt(specs):
-        rows = specs.get("Battery", [])
-        for t, v in rows:
-            if "mah" in v.lower():
-                return v
-        size = specs.get("_hl", {}).get("batsize", "")
-        if size:
-            size = size if "mah" in size.lower() else f"{size} mAh"
-            for t, v in rows:
-                if t.lower() == "type" and v:
-                    return v if "mah" in v.lower() else f"{size} ({v})"
-            return size
-        for t, v in rows:
-            if t.lower() == "type" and v:
-                return v
-        return ""
-
     def block(*vals):
         return "\n".join(v for v in vals if v)
 
-    disp = block(g("Display", "Type"), g("Display", "Size"), g("Display", "Resolution"))
+    hl = specs.get("_hl", {})
+    bsize = hl.get("batsize-hl", "")
+    bsize = bsize if "mah" in bsize.lower() else (f"{bsize} mAh" if bsize else "")
+    btype = g("Battery", "Type")
+    batt = btype if btype and "mah" in btype.lower() else (
+        f"{bsize} ({btype})" if bsize and btype else (bsize or btype)
+    )
+    disp = block(hl.get("displaytype", ""), g("Display", "Size"), g("Display", "Resolution"))
     chip = block(g("Platform", "Chipset"), g("Platform", "CPU"), g("Platform", "GPU"))
-    rear = (g("Main Camera", "Quad") or g("Main Camera", "Triple") or g("Main Camera", "Dual") or g("Main Camera", "Single") or first("Main Camera"))
-    front = (g("Selfie camera", "Single") or first("Selfie camera"))
-    img = specs.get("_hl", {}).get("image", "")
     rows = [
-        ("Status", g("Launch", "Status")),
-        ("Network", g("Network", "Technology") or first("Network")),
-        ("Weight", g("Body", "Weight")),
+        ("Status", hl.get("status", "") or g("Launch", "Status")),
+        ("Network", hl.get("nettech", "") or first("Network")),
+        ("WiFi", hl.get("wlan", "")),
+        ("Bluetooth", hl.get("bluetooth", "") or g("Comms", "Bluetooth")),
+        ("Weight", hl.get("weight", "") or g("Body", "Weight")),
         ("Display", disp),
         ("Chipset", chip),
-        ("Memory", g("Memory", "Internal")),
-        ("Rear Camera", rear),
-        ("Front Camera", front),
+        ("Memory", hl.get("internalmemory", "") or g("Memory", "Internal")),
+        ("Rear Camera", hl.get("cam1modules", "")),
+        ("Front Camera", hl.get("cam2modules", "")),
         ("3.5mm jack", g("Sound", "3.5mm jack")),
         ("USB", g("Comms", "USB")),
-        ("Sensors", g("Features", "Sensors") or first("Features")),
-        ("Battery", batt(specs)),
+        ("Sensors", hl.get("sensors", "")),
+        ("Battery", batt),
     ]
     lines = [f"[{name}]({url})", ""]
     for label, val in rows:
