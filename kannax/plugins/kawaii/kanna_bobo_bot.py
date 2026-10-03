@@ -80,9 +80,16 @@ async def ln_user_(message: Message):
         return
     text = getattr(response, "text", None) or getattr(response, "caption", None)
     if not text:
-        await message.edit(
-            "O bot retornou uma mensagem sem texto (mídia/sticker?).", del_in=5
-        )
+        # media/sticker/button-only reply: forward the bot message itself
+        # so the result still reaches the chat
+        try:
+            await response.copy(chat_id=message.chat.id)
+            await message.delete()
+        except Exception as fwd_e:
+            await message.edit(
+                f"O bot respondeu com mídia sem texto e não consegui encaminhar: `{fwd_e}`",
+                del_in=10,
+            )
         return
     html = text.html if hasattr(text, "html") else str(text)
     await message.edit(html, parse_mode="html")
