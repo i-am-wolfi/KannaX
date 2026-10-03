@@ -1,111 +1,141 @@
-# by @fnixdev
+# device specs via GSM Arena (no bot needed)
+
+"""puxa ficha de celular direto do gsmarena.com"""
 
 import asyncio
+import re
 
-from pyrogram.errors import YouBlockedUser
+import requests
+from bs4 import BeautifulSoup
 
 from kannax import Message, kannax
-from kannax.utils.exceptions import StopConversation
+
+_UA = {
+    "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/120 Safari/537.36"
+}
+_SPEC_RE = re.compile(r"^https?://(?:www|m)\.gsmarena\.com/[a-z0-9_\-]+-\d+\.php$")
+_SKIP_RE = re.compile(r"-(pictures|review|price|vs_|compare)")
+
+
+def _search_models(query: str, limit: int = 6) -> list:
+    """Find GSM Arena spec page URLs via DuckDuckGo site: search."""
+    resp = requests.post(
+        "https://html.duckduckgo.com/html/",
+        data={"q": f"site:gsmarena.com {query} Full phone specifications"},
+        headers=_UA,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    soup = BeautifulSoup(resp.content, "html.parser")
+    found = []
+    for a in soup.select("a.result__a"):
+        href = a.get("href", "")
+        title = a.get_text(" ", strip=True)
+        if _SPEC_RE.match(href) and not _SKIP_RE.search(href) and href not in found:
+            name = re.sub(r"\s*-\s*Full phone specifications.*$", "", title).strip()
+            found.append((name or href, href))
+        if len(found) >= limit:
+            break
+    return found
+
+
+def _get_spec(url: str, row: str) -> str:
+    """First matching spec row text for a section title."""
+    try:
+        resp = requests.get(url, headers=_UA, timeout=30)
+        resp.raise_for_status()
+    except Exception:
+        return ""
+    soup = BeautifulSoup(resp.content, "html.parser")
+    h1 = soup.find("h1")
+    name = h1.get_text(strip=True) if h1 else ""
+    cur_sec, picked, specs = "", {}, {}
+    for tr in soup.select("#specs-list tr"):
+        th = tr.find("th")
+        if th:
+            cur_sec = th.get_text(strip=True)
+            continue
+        ttl = tr.find("td", class_="ttl")
+        nfo = tr.find("td", class_="nfo")
+        if ttl and nfo:
+            key = (cur_sec, ttl.get_text(strip=True))
+            if key not in picked:
+                picked[key] = nfo.get_text(" ", strip=True)
+                specs.setdefault(cur_sec, []).append(
+                    (ttl.get_text(strip=True), nfo.get_text(" ", strip=True))
+                )
+    if row == "name":
+        return name
+    if row == "all":
+        return specs  # type: ignore[return-value]
+    sec, ttl = row.split("|", 1)
+    return picked.get((sec, ttl), "")
+
+
+def _fmt_specs(name: str, url: str, specs: dict) -> str:
+    def g(sec, ttl):
+        for t, v in specs.get(sec, []):
+            if t == ttl:
+                return v
+        return ""
+
+    def first(sec, skip=("Features", "Video")):
+        for t, v in specs.get(sec, []):
+            if t not in skip and v:
+                return v
+        rows = specs.get(sec, [])
+        return rows[0][1] if rows else ""
+
+    res = g("Display", "Resolution").split(",")[0]
+    rows = [
+        ("🖥 Tela", " | ".join(v for v in (g("Display", "Size").split(",")[0], g("Display", "Type"), res) if v)),
+        ("⚙ Chip", g("Platform", "Chipset")),
+        ("🧠 RAM/ROM", g("Memory", "Internal")),
+        ("📷 Traseira", g("Main Camera", "Triple") or g("Main Camera", "Dual") or g("Main Camera", "Single") or g("Main Camera", "Quad") or first("Main Camera")),
+        ("🤳 Frontal", g("Selfie camera", "Single") or first("Selfie camera")),
+        ("🔋 Bateria", g("Battery", "Type") or first("Battery", skip=())),
+        ("📏 Corpo", " | ".join(v for v in (g("Body", "Dimensions"), g("Body", "Weight")) if v)),
+        ("📅 Lançado", " | ".join(v for v in (g("Launch", "Announced"), g("Launch", "Status")) if v)),
+        ("🎨 Cores", g("Misc", "Colors")),
+    ]
+    lines = [f"📱 **{name}**", ""]
+    lines += [f"**{label}:** {val}" for label, val in rows if val]
+    lines += ["", f"🔗 [Ficha completa]({url})"]
+    return "\n".join(lines)
 
 
 @kannax.on_cmd(
     "d",
     about={
-        "header": "Device description",
-        "description": "Obtenha todos os dados de um dispositivo via @PyKoroneBot.",
+        "header": "Ficha de celular (GSM Arena)",
+        "description": "Busca as especificações de um dispositivo no gsmarena.com.",
         "usage": "{tr}d [dispositivo]",
     },
 )
-async def ln_user_(message: Message):
-    """device desc via @PyKoroneBot"""
-    device_ = (message.input_str or "").strip()
-    if not device_:
+async def gsm_device(message: Message):
+    """device specs from gsm arena"""
+    query = (message.input_str or "").strip()
+    if not query:
         await message.edit("`Forneça um dispositivo. Ex: ,d Redmi Note 12`", del_in=5)
         return
-    bot_ = "@PyKoroneBot"
-    await message.edit(f"Consultando `{device_}` em {bot_} ...")
+    await message.edit(f"`Buscando {query} no GSM Arena...`")
     try:
-        async with kannax.conversation(bot_, timeout=30) as conv:
-            try:
-                await conv.send_message(f"/d {device_}")
-            except YouBlockedUser:
-                await message.err(f"Desbloqueie {bot_} primeiro...", del_in=5)
-                return
-            # bots often reply with several messages ("searching..." then
-            # the result); collect follow-ups and keep the longest text
-            # instead of blindly showing the first one.
-            candidates = []
-            try:
-                first = await conv.get_response(mark_read=True)
-                if first is not None:
-                    candidates.append(first)
-            except asyncio.TimeoutError:
-                pass
-            for _ in range(3):
-                try:
-                    nxt = await conv.get_response(timeout=8, mark_read=True)
-                    if nxt is None:
-                        break
-                    candidates.append(nxt)
-                except (asyncio.TimeoutError, Exception):
-                    break
-            if not candidates:
-                await message.edit(
-                    f"{bot_} não respondeu em 30s. "
-                    f"Abra {bot_} e mande /start uma vez, depois tente de novo.",
-                    del_in=10,
-                )
-                return
-            def _score(m):
-                mk = getattr(m, "reply_markup", None)
-                if mk and getattr(mk, "inline_keyboard", None):
-                    return (1, 0)  # device picker buttons win over plain text
-                t = getattr(m, "text", None) or getattr(m, "caption", None) or ""
-                return (0, len(t))
-
-            response = max(candidates, key=_score)
-    except StopConversation as sc_e:
-        if "already started" in str(sc_e):
-            await message.edit(
-                "Já há uma consulta em andamento com esse bot. "
-                "Aguarde concluir e tente de novo.",
-                del_in=5,
-            )
-        else:
-            await message.edit(f"Conversa encerrada: `{sc_e}`", del_in=5)
-        return
-    except YouBlockedUser:
-        await message.err(f"Desbloqueie {bot_} primeiro...", del_in=5)
-        return
+        models = await asyncio.to_thread(_search_models, query)
     except Exception as e:
-        await message.edit(f"<b>ERRO:</b> <code>{e}</code>")
+        await message.edit(f"`Busca falhou: {e}`", del_in=10)
         return
-    text = getattr(response, "text", None) or getattr(response, "caption", None)
-    markup = getattr(response, "reply_markup", None)
-    if markup and getattr(markup, "inline_keyboard", None):
-        # multiple devices: bot sent buttons to pick one. Forward it
-        # (forward keeps buttons working; a copy would kill callbacks).
-        # The user taps the phone they want right in the chat.
-        try:
-            await response.forward(chat_id=message.chat.id)
-            await message.delete()
-        except Exception as fwd_e:
-            await message.edit(
-                f"Encontrei opções mas não consegui encaminhar: `{fwd_e}`",
-                del_in=10,
-            )
+    if not models:
+        await message.edit(f"`Nada encontrado para {query}. Tente outro nome.`", del_in=10)
         return
-    if not text:
-        # media/sticker reply: copy the bot message itself
-        # so the result still reaches the chat
-        try:
-            await response.copy(chat_id=message.chat.id)
-            await message.delete()
-        except Exception as fwd_e:
-            await message.edit(
-                f"O bot respondeu com mídia sem texto e não consegui encaminhar: `{fwd_e}`",
-                del_in=10,
-            )
+    name, url = models[0]
+    try:
+        specs = await asyncio.to_thread(_get_spec, url, "all")
+        title = await asyncio.to_thread(_get_spec, url, "name")
+    except Exception as e:
+        await message.edit(f"`Falha lendo a ficha: {e}`", del_in=10)
         return
-    html = text.html if hasattr(text, "html") else str(text)
-    await message.edit(html, parse_mode="html")
+    text = _fmt_specs(title or name, url, specs)
+    if len(models) > 1:
+        others = "\n".join(f"• {n}" for n, _ in models[1:4])
+        text += f"\n\n**Também achei:**\n{others}\nRefine a busca se não for esse."
+    await message.edit(text, disable_web_page_preview=True)
