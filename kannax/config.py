@@ -29,7 +29,7 @@ class Config:
 
     API_ID = int(os.environ.get("API_ID"))
     API_HASH = os.environ.get("API_HASH")
-    WORKERS = int(os.environ.get("WORKERS")) or os.cpu_count() + 4
+    WORKERS = int(os.environ.get("WORKERS") or 0) or os.cpu_count() + 4
     BOT_TOKEN = os.environ.get("BOT_TOKEN")
     HU_STRING_SESSION = os.environ.get("HU_STRING_SESSION")
     OWNER_ID = tuple(
