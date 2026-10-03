@@ -57,36 +57,64 @@ def _load_index() -> list:
     return index
 
 
+def _variants(query: str) -> list:
+    """Query fallbacks for model numbers.
+
+    j500m -> j500 -> j5 (variant suffix, then model root).
+    Char-by-char chopping is NOT used: j50 would falsely match asus j502.
+    """
+    out = [query]
+    q = query.strip().lower()
+    v2 = re.sub(r"[a-z]+$", "", q).strip()
+    if v2 and v2 not in out:
+        out.append(v2)
+    m = re.match(r"^([a-z]+)\d*?(\d)", v2.split()[0] if v2 else "")
+    if m:
+        root = f"{m.group(1)}{m.group(2)}"
+        rest = v2.split()[1:]
+        v3 = " ".join([root] + rest)
+        if v3 not in out:
+            out.append(v3)
+    return out
+
+
 def _search_models(query: str, limit: int = 6) -> list:
     """Match query against the local GSM Arena sitemap index.
 
     No external search engine (they throttle datacenter IPs); the
-    sitemap is cached on disk and refreshed weekly.
+    sitemap is cached on disk and refreshed weekly. Tries progressively
+    shorter query variants so model numbers (j500m) still resolve.
     """
     qtokens = _norm(query)
     if not qtokens:
         return []
-    scored = []
-    for name, url in _load_index():
-        ntokens = set(_norm(name))
-        flat = name.replace(" ", "")
-        hits, exact = 0, 0
-        for t in qtokens:
-            if t in ntokens:
-                hits += 1
-                exact += 1
-            elif len(t) > 1 and t in flat:
-                # single letters only match whole tokens, otherwise "g"
-                # would match every name containing the letter g
-                hits += 1
-        if hits == 0:
-            continue
-        # all query tokens matched wins; exact token beats substring;
-        # then fewest extra tokens; then newest id
-        extra = len(ntokens) - hits
-        m = re.search(r"-(\d+)\.php$", url)
-        pid = int(m.group(1)) if m else 0
-        scored.append((hits / len(qtokens), exact, -extra, pid, name, url))
+    index = _load_index()
+    for variant in _variants(query):
+        vtokens = _norm(variant)
+        scored = []
+        for name, url in index:
+            ntokens = set(_norm(name))
+            flat = name.replace(" ", "")
+            hits, exact = 0, 0
+            for t in vtokens:
+                if t in ntokens:
+                    hits += 1
+                    exact += 1
+                elif len(t) > 1 and t in flat:
+                    # single letters only match whole tokens, otherwise "g"
+                    # would match every name containing the letter g
+                    hits += 1
+            if hits == 0:
+                continue
+            # all query tokens matched wins; exact token beats substring;
+            # then fewest extra tokens; then newest id
+            extra = len(ntokens) - hits
+            m = re.search(r"-(\d+)\.php$", url)
+            pid = int(m.group(1)) if m else 0
+            scored.append((hits / len(vtokens), exact, -extra, pid, name, url))
+        scored.sort(reverse=True)
+        if scored and scored[0][0] == 1.0:
+            return [(n, u) for _, _, _, _, n, u in scored[:limit]]
     scored.sort(reverse=True)
     return [(n, u) for _, _, _, _, n, u in scored[:limit]]
 
@@ -175,7 +203,6 @@ def _fmt_specs(name: str, url: str, specs: dict) -> str:
     front = (g("Selfie camera", "Single") or first("Selfie camera"))
     img = specs.get("_hl", {}).get("image", "")
     rows = [
-        ("Foto", f"[📷 ver foto]({img})" if img else ""),
         ("Status", g("Launch", "Status")),
         ("Network", g("Network", "Technology") or first("Network")),
         ("Weight", g("Body", "Weight")),
@@ -232,4 +259,24 @@ async def gsm_device(message: Message):
         await message.edit(f"`Falha lendo a ficha: {e}`", del_in=10)
         return
     text = _fmt_specs(title or name, url, specs)
+    img = specs.get("_hl", {}).get("image", "")
+    if img:
+        # photo WITH the card as caption (nothing downloaded to gallery
+        # beyond Telegram's normal cache; falls back to plain text)
+        try:
+            if len(text) <= 1024:
+                await message.client.send_photo(
+                    chat_id=message.chat.id, photo=img, caption=text
+                )
+            else:
+                await message.client.send_photo(
+                    chat_id=message.chat.id,
+                    photo=img,
+                    caption=f"[{title or name}]({url})",
+                )
+                await message.reply(text, disable_web_page_preview=True)
+            await message.delete()
+            return
+        except Exception:
+            pass
     await message.edit(text, disable_web_page_preview=True)
