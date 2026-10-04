@@ -39,12 +39,19 @@ async def ksun_(message: Message):
                     break
     except Exception as e:
         await message.edit(
-            f"`Falha lendo @{CHANNEL}: {e}\nEntre no canal uma vez e tente de novo.`",
+            f"`Falha lendo @{CHANNEL}: {e}`\n"
+            f"👉 Entre no canal primeiro: https://t.me/{CHANNEL} "
+            "e tente de novo.",
             del_in=10,
         )
         return
     if not found:
-        await message.edit(f"`Build {build} não achado em @{CHANNEL}.`", del_in=10)
+        await message.edit(
+            f"`Build {build} não achado em @{CHANNEL}.`\n"
+            f"👉 Se você não está no canal, entre: https://t.me/{CHANNEL} "
+            "e tente de novo.",
+            del_in=10,
+        )
         return
     text = found.text or found.caption or ""
     ver = _VER_RE.search(text)
