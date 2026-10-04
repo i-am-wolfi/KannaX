@@ -25,18 +25,44 @@ async def ksun_(message: Message):
         await message.err("Forneça o número do build. Ex: `,ksun 33318`", del_in=5)
         return
     await message.edit(f"`Procurando build {build} em @{CHANNEL}...`")
+    # posts carry hashtags like #ci_3215 for build 33215 (last 4 digits);
+    # plain-number search mismatches (33215 returned 33219), so target
+    # the hashtag first, then verify the full number in the post.
+    tag = f"#ci_{build[-4:]}"
     try:
+        cands = []
+        async for msg in kannax.search_messages(CHANNEL, query=tag, limit=20):
+            cands.append(msg)
+        if not cands:
+            async for msg in kannax.search_messages(CHANNEL, query=build, limit=20):
+                cands.append(msg)
+
+        def _info(msg):
+            text = (msg.text or msg.caption or "")
+            doc = getattr(msg, "document", None)
+            return (
+                tag.lower() in text.lower(),
+                build in text,
+                bool(doc and (doc.file_name or "").endswith(".apk")),
+                bool(doc or msg.photo or msg.video),
+            )
+
+        cands.sort(
+            key=lambda m: (_info(m)[0], _info(m)[1], _info(m)[2]),
+            reverse=True,
+        )
         found = None
-        async for msg in kannax.search_messages(CHANNEL, query=build, limit=20):
-            if msg.document and (msg.document.file_name or "").endswith(".apk"):
-                found = msg
+        for m in cands:
+            has_tag, has_build, is_apk, _ = _info(m)
+            if (has_tag and has_build) or (has_tag and is_apk):
+                found = m
                 break
         if not found:
-            # retry: any media message mentioning the build
-            async for msg in kannax.search_messages(CHANNEL, query=build, limit=20):
-                if msg.document or msg.photo or msg.video:
-                    found = msg
-                    break
+            # last resort: any media in candidates
+            found = next(
+                (m for m in cands if _info(m)[3]),
+                None,
+            )
     except Exception as e:
         await message.edit(
             f"`Falha lendo @{CHANNEL}: {e}`\n"
