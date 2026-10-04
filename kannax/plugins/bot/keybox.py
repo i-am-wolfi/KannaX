@@ -20,7 +20,7 @@ async def keybox_(message: Message):
     await message.edit(f"`Buscando keybox em @{CHANNEL}...`")
     try:
         found = None
-        async for msg in kannax.get_history(CHANNEL, limit=50):
+        for msg in await kannax.get_history(CHANNEL, limit=50):
             doc = getattr(msg, "document", None)
             if doc and (doc.file_name or "").lower().endswith(".xml"):
                 found = msg
