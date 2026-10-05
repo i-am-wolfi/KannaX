@@ -64,11 +64,11 @@ __{uploader}__
                               'options': {'-a': 'select the audio u-id',
                                           '-v': 'select the video u-id',
                                           '-m': 'extract the mp3 in 320kbps',
-                                          '-t': 'upload to telegram'},
-                              'examples': ['{tr}ytdl link',
+                                          '-t': 'upload to telegram (default, kept for compat)'},
+                              'examples': ['{tr}ytdl link (720p mp4, sends to telegram)',
                                            '{tr}ytdl -a12 -v120 link',
-                                           '{tr}ytdl -m -t link will upload the mp3',
-                                           '{tr}ytdl -m -t -d link will upload '
+                                           '{tr}ytdl -m link will upload the mp3',
+                                           '{tr}ytdl -m -d link will upload '
                                            'the mp3 as a document']}, del_pre=True)
 async def ytDown(message: Message):
     """ download from a link """
@@ -132,8 +132,8 @@ async def ytDown(message: Message):
             await message.err("nothing found !")
             return
         await message.edit(f"**YTDL completed in {round(time() - startTime)} seconds**\n`{_fpath}`")
-        if 't' in message.flags:
-            await upload(message, Path(_fpath))
+        # always send to telegram (-t kept for compat); -d sends as document
+        await upload(message, Path(_fpath))
     else:
         await message.edit(str(retcode))
 
@@ -202,9 +202,21 @@ def _tubeDl(url: list, prog, starttime, uid=None):
              'logger': LOGGER,
              'writethumbnail': True,
              'prefer_ffmpeg': True,
+             'noplaylist': True,
+             'retries': 3,
+             # no JS runtime = yt-dlp can't decipher YT signatures
+             # (slow/missing formats); deno preferred, node fallback
+             'js_runtimes': {'deno': {}, 'node': {'path': '/usr/bin/node'}},
+             # YT SABR experiment kills web-client URLs; android client
+             # still yields progressive mp4 (360p+) as fallback
+             'extractor_args': {'youtube': {'player_client': ['android', 'web', 'tv']}},
+             # fragmented downloads in parallel (yt-dlp): big speedup
+             'concurrent_fragment_downloads': 5,
              'postprocessors': [
                  {'key': 'FFmpegMetadata'}]}
-    _quality = {'format': 'bestvideo+bestaudio/best' if not uid else str(uid)}
+    # default: single merged 720p mp4 (no 4K VP9 + merge roundtrip)
+    _quality = {'format': ('best[height<=720][ext=mp4]/best[height<=720]/'
+                           'best[ext=mp4]/best') if not uid else str(uid)}
     _opts.update(_quality)
     try:
         x = ytdl.YoutubeDL(_opts)
@@ -223,6 +235,10 @@ def _mp3Dl(url, prog, starttime):
              'logger': LOGGER,
              'writethumbnail': True,
              'prefer_ffmpeg': True,
+             'noplaylist': True,
+             'retries': 3,
+             'js_runtimes': {'deno': {}, 'node': {'path': '/usr/bin/node'}},
+             'extractor_args': {'youtube': {'player_client': ['android', 'web', 'tv']}},
              'format': 'bestaudio/best',
              'postprocessors': [
                  {
