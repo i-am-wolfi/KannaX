@@ -127,6 +127,14 @@ _checkUpstreamRepo() {
 _setupPlugins() {
     local link path tmp
     if test $(grep -P '^'$2'$' <<< $3); then
+        # Xtra re-clone + pip install every boot costs ~60s. Refresh at
+        # most once per XTRA_REFRESH_HOURS (default 24h).
+        local marker=".xtra_updated_$1"
+        local max_age=${XTRA_REFRESH_HOURS:-24}
+        if test -f "$marker" && test $(($(date +%s) - $(stat -c %Y "$marker"))) -lt $((max_age * 3600)); then
+            editLastMessage "$1 Plugins em cache (atualiza em ${max_age}h) ..."
+            return
+        fi
         editLastMessage "Clonando $1 Plugins ..."
         link=$(test $4 && echo $4 || echo $3)
         tmp=Temp-Plugins
@@ -139,6 +147,7 @@ _setupPlugins() {
         mv $tmp/plugins/ kannax/plugins/$path/
         cp -r $tmp/resources/. resources/
         rm -rf $tmp/
+        touch "$marker"
         _LOGBOT_CLEANUP=1
         deleteLastMessage
         _LOGBOT_CLEANUP=0
