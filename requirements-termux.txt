@@ -50,7 +50,6 @@ python-dotenv>=0.15.0
 pytz>=2020.4
 pytube
 rarfile>=4.0
-removebg>=0.4
 requests>=2.25.0
 search-engine-parser>=0.6.0
 setuptools>=40.3.0

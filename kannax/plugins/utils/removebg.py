@@ -5,7 +5,7 @@
 import os
 from datetime import datetime
 
-from removebg import RemoveBg
+import requests
 
 from kannax import Config, Message, kannax
 from kannax.utils import progress
@@ -51,11 +51,20 @@ async def remove_background(message: Message):
         end_t = datetime.now()
         m_s = (end_t - start_t).seconds
         await message.edit(f"Image saved in {m_s} seconds.\nRemoving Background Now...")
-        # Cooking Image
+        # Cooking Image: remove.bg API direta (lib removebg morreu, sem release py3.14)
         try:
-            rmbg = RemoveBg(Config.REMOVE_BG_API_KEY, "removebg_error.log")
-            rmbg.remove_background_from_img_file(IMG_PATH)
+            with open(IMG_PATH, "rb") as img_f:
+                resp = requests.post(
+                    "https://api.remove.bg/v1.0/removebg",
+                    headers={"X-Api-Key": Config.REMOVE_BG_API_KEY},
+                    files={"image_file": img_f},
+                    data={"size": "auto"},
+                    timeout=120,
+                )
+            resp.raise_for_status()
             rbg_img_path = IMG_PATH + "_no_bg.png"
+            with open(rbg_img_path, "wb") as out_f:
+                out_f.write(resp.content)
             start_t = datetime.now()
             await message.client.send_document(
                 chat_id=message.chat.id,

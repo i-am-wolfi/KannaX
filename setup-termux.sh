@@ -18,7 +18,7 @@ command -v pkg >/dev/null 2>&1 || die "comando 'pkg' não encontrado."
 # Termux (python-*) em vez de compilar via pip — pip tentando compilar
 # por cima desses quebra. A venv abaixo usa --system-site-packages para
 # enxergá-los, e o pip os considera satisfeitos.
-PKG_PYTHON_DEPS="python-numpy python-pillow python-lxml python-psutil"
+PKG_PYTHON_DEPS="python-numpy python-pillow python-lxml python-psutil python-cryptography"
 
 info "atualizando pacotes..."
 pkg update -y || die "falha no pkg update"
