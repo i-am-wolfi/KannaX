@@ -15,10 +15,9 @@ from pathlib import Path
 from time import time
 from math import floor
 
-import wget
 
 from kannax import kannax, Message, Config, pool
-from kannax.utils import time_formatter, humanbytes
+from kannax.utils import time_formatter, humanbytes, download_file
 from .upload import upload
 
 LOGGER = kannax.getLogger(__name__)
@@ -51,7 +50,7 @@ __{uploader}__
 {table}
     """.format_map(_exracted)
     if _exracted['thumb']:
-        _tmp = await pool.run_in_thread(wget.download)(
+        _tmp = await pool.run_in_thread(download_file)(
             _exracted['thumb'], os.path.join(Config.DOWN_PATH, f"{time()}.jpg"))
         await message.reply_photo(_tmp, caption=out)
         await message.delete()

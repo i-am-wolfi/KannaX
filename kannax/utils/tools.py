@@ -174,3 +174,37 @@ def clean_obj(obj, convert: bool = False):
     if isinstance(obj, dict):
         return {key: clean_obj(value) for key, value in obj.items() if key != "_"}
     return obj
+
+
+def download_file(url: str, out=None) -> str:
+    """Drop-in replacement for wget.download (lib wget is dead on py3.13+).
+
+    Downloads url to out (file path or directory). Returns saved path.
+    """
+    import requests as _rq
+
+    from urllib.parse import unquote_plus, urlparse
+
+    resp = _rq.get(
+        url,
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=120,
+        stream=True,
+    )
+    resp.raise_for_status()
+    name = unquote_plus(os.path.basename(urlparse(url).path.rstrip("/"))) or "download"
+    if out is None:
+        path = os.path.join(os.getcwd(), name)
+    elif os.path.isdir(out) or out.endswith(os.sep):
+        os.makedirs(out, exist_ok=True)
+        path = os.path.join(out, name)
+    else:
+        parent = os.path.dirname(out)
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        path = out
+    with open(path, "wb") as f:
+        for chunk in resp.iter_content(1024 * 64):
+            if chunk:
+                f.write(chunk)
+    return path

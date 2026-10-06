@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 
 import feedparser
-import wget
 from dateutil import parser
 from pyrogram.errors import (
     ChannelPrivate,
@@ -21,6 +20,7 @@ from pyrogram.errors import (
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from kannax import Config, Message, get_collection, logging, pool, kannax
+from kannax.utils import download_file
 from kannax.utils.exceptions import KannaXBotNotFound
 
 RSS_CHAT_ID = [
@@ -89,7 +89,7 @@ async def send_new_post(entries):
             Config.DOWN_PATH, f"{title}.{str(thumb_url).split('.')[-1]}"
         )
         if not os.path.exists(thumb):
-            await pool.run_in_thread(wget.download)(thumb_url, thumb)
+            await pool.run_in_thread(download_file)(thumb_url, thumb)
     if time:
         time = _parse_time(time)[0]
     if entries.get("authors"):

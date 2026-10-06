@@ -7,7 +7,7 @@ import os
 import random
 import re
 import requests
-import wget
+from kannax.utils import download_file  # wget morto: helper local
 import datetime
 import math
 from cowpy import cow
@@ -308,7 +308,7 @@ async def decide_(message: Message):
         r = requests.get(f"https://yesno.wtf/api?force={decision}").json()
     else:
         r = requests.get("https://yesno.wtf/api").json()
-    path = wget.download(r["image"])
+    path = download_file(r["image"])
     chat_id = message.chat.id
     message_id = None
     if message.reply_to_message:

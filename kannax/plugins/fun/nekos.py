@@ -2,7 +2,7 @@ import os
 
 from anekos import NekosLifeClient, NSFWImageTags, SFWImageTags
 from pyrogram.errors import MediaEmpty, WebpageCurlFailed
-from wget import download
+from kannax.utils import download_file as download
 
 from kannax import Message, kannax
 

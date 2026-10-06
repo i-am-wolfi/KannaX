@@ -21,7 +21,7 @@ from pyrogram.types import (
     InputMediaPhoto,
     InputMediaVideo,
 )
-from wget import download
+from kannax.utils import download_file as download
 from youtube_dl.utils import DownloadError, ExtractorError, GeoRestrictedError
 from youtubesearchpython import VideosSearch
 

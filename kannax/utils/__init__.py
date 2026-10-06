@@ -25,6 +25,7 @@ from .progress import progress
 from .sys_tools import SafeDict, get_import_path, secure_text, terminate
 from .tools import (
     clean_obj,
+    download_file,
     get_file_id,
     humanbytes,
     is_dev,

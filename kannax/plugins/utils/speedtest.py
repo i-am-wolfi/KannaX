@@ -5,10 +5,9 @@
 import os
 
 import speedtest
-import wget
 
 from kannax import Message, kannax
-from kannax.utils import humanbytes
+from kannax.utils import download_file, humanbytes
 
 CHANNEL = kannax.getCLogger(__name__)
 
@@ -28,7 +27,7 @@ async def speedtst(message: Message):
     except Exception as e:
         await message.err(text=e)
         return
-    path = wget.download(result["share"])
+    path = download_file(result["share"])
     output = f"""**--Iniciado as {result['timestamp']}--
 Cliente:
 ISP: `{result['client']['isp']}`

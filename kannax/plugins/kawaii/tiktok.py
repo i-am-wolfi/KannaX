@@ -1,7 +1,7 @@
 # tiktok downloader
 
 import os
-from wget import download
+from kannax.utils import download_file as download
 
 from kannax import Message, kannax, Config
 from kannax.utils import get_response

@@ -3,8 +3,6 @@
 import asyncio
 import math
 import os
-import shutil
-import subprocess
 from datetime import datetime
 from typing import Tuple, Union
 from urllib.parse import unquote_plus, urlparse
@@ -113,16 +111,6 @@ def _gofile_direct(url: str) -> tuple:
     return f["link"], f.get("name") or f"{cid}.bin", f.get("size", 0), token
 
 
-def _wget_dl(url: str, dl_loc: str, filename: str) -> None:
-    """Blocking wget fallback (works from residential IPs where
-    Cloudflare passes real clients but not python-requests)."""
-    cmd = ["wget", "-q", "--content-disposition", "--trust-server-names",
-           "-U", _BROWSER_UA["User-Agent"], "-O", dl_loc, url]
-    proc = subprocess.run(cmd, capture_output=True, text=True, timeout=7200)
-    if proc.returncode != 0 or not os.path.isfile(dl_loc):
-        raise RuntimeError(f"wget falhou: {(proc.stderr or '')[:200]}")
-
-
 async def url_download(message: Message, url: str) -> Tuple[str, int]:
     """download from link (streamed requests, wget fallback, progress + cancel)"""
     await message.edit("`Downloading From URL...`")
@@ -134,19 +122,11 @@ async def url_download(message: Message, url: str) -> Tuple[str, int]:
         if c_file_name:
             custom_file_name = c_file_name.strip()
     if "sourceforge.net" in urlparse(url).netloc:
-        # Cloudflare blocks python-requests from servers; wget passes
-        # from residential IPs, so go straight to it.
-        if custom_file_name in ("download", "") and "|" not in (message.input_str or ""):
-            custom_file_name = _file_name(url)
-        dl_loc = os.path.join(Config.DOWN_PATH, custom_file_name)
-        await message.edit("`Baixando via wget (SourceForge)...`")
-        try:
-            await asyncio.to_thread(_wget_dl, url, dl_loc, custom_file_name)
-        except Exception as w_e:
-            raise RuntimeError(f"SourceForge falhou até no wget: {w_e}") from w_e
-        if not os.path.isfile(dl_loc) or os.path.getsize(dl_loc) == 0:
-            raise RuntimeError("download vazio (SourceForge pode ter bloqueado este IP)")
-        return dl_loc, (datetime.now() - start_t).seconds
+        raise RuntimeError(
+            "SourceForge não baixa pelo bot (Cloudflare bloqueia; "
+            "nem wget passou). Baixe no PC/celular e envie o arquivo, "
+            "ou use ,upload respondendo a ele."
+        )
     gofile_token = ""
     if "gofile.io" in urlparse(url).netloc:
         await message.edit("`Resolvendo link Gofile...`")
@@ -167,21 +147,7 @@ async def url_download(message: Message, url: str) -> Tuple[str, int]:
         resp = await asyncio.to_thread(_get)
         resp.raise_for_status()
     except Exception as dl_e:
-        # requests blocked (Cloudflare etc.) -> wget fallback, which
-        # passes from residential IPs where python gets 403
-        if not shutil.which("wget"):
-            raise RuntimeError(f"falha baixando URL: {dl_e}") from dl_e
-        await message.edit("`Site bloqueou o modo direto, tentando wget...`")
-        if custom_file_name in ("download", "") and "|" not in (message.input_str or ""):
-            custom_file_name = _file_name(url)
-        dl_loc = os.path.join(Config.DOWN_PATH, custom_file_name)
-        try:
-            await asyncio.to_thread(_wget_dl, url, dl_loc, custom_file_name)
-        except Exception as w_e:
-            raise RuntimeError(f"falha baixando URL: {dl_e} | wget: {w_e}") from w_e
-        if not os.path.isfile(dl_loc) or os.path.getsize(dl_loc) == 0:
-            raise RuntimeError(f"download vazio/falhou: {dl_e}")
-        return dl_loc, (datetime.now() - start_t).seconds
+        raise RuntimeError(f"falha baixando URL: {dl_e}") from dl_e
     if custom_file_name in ("download", "") and "|" not in (message.input_str or ""):
         custom_file_name = _file_name(url, resp)
     dl_loc = os.path.join(Config.DOWN_PATH, custom_file_name)
