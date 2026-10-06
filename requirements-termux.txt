@@ -38,7 +38,6 @@ heroku3>=4.2.3
 html-telegraph-poster>=0.2.31
 lxml>=6.0.0
 lxml_html_clean>=0.2.0
-imutils
 motor>=2.3.0
 numpy
 oauth2client>=4.1.3
