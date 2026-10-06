@@ -47,6 +47,10 @@ pip install -q --upgrade pip || die "falha no pip"
 
 # 3. dependências python ----------------------------------------------------
 info "instalando requirements-termux.txt (pode demorar)..."
+# pyaes (dep do pyrogram) sumiu de alguns índices/mirrors: instala antes,
+# direto do GitHub (zip puro, sem build), para o pip considerar satisfeito.
+pip install -q "https://github.com/ricmoo/pyaes/archive/refs/heads/master.zip" \
+    && ok "pyaes via GitHub" || info "pyaes via GitHub falhou, tentando pelo índice..."
 if ! pip install -r requirements-termux.txt; then
     info "tentando só com pacotes binários..."
     pip install --only-binary :all: -r requirements-termux.txt \
