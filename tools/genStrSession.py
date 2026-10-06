@@ -10,8 +10,6 @@ import os
 
 from pyrogram import Client
 
-_SESSION_FILE = "genstr_tmp"
-
 
 def main() -> None:
     print("=== Kanna-X — gerador de HU_STRING_SESSION (Pyrogram) ===")
@@ -20,16 +18,17 @@ def main() -> None:
     api_hash = input("Enter API_HASH: ").strip()
 
     async def _gen() -> str:
-        # sessão em arquivo (a ":memory:" perdia a chave no Termux) + retry
-        for f in (_SESSION_FILE + ".session", _SESSION_FILE + ".session-journal"):
-            try:
-                os.remove(f)
-            except OSError:
-                pass
+        # sessão com nome único por tentativa: nada é reaproveitado
+        # (sessão parcial reutilizada = AUTH_KEY_UNREGISTERED certo)
+        import time as _t
+
         last_err = None
         for attempt in range(2):
+            sess = f"genstr_{os.getpid()}_{attempt}_{int(_t.time())}"
             try:
-                async with Client(_SESSION_FILE, api_id=api_id, api_hash=api_hash) as app:
+                async with Client(sess, api_id=api_id, api_hash=api_hash) as app:
+                    me = await app.get_me()
+                    print(f"Logado como: {me.first_name} (id={me.id})")
                     session = await app.export_session_string()
                     if len(session.strip()) not in (351, 356):
                         raise RuntimeError(
@@ -46,7 +45,8 @@ def main() -> None:
                 if "AUTH_KEY_UNREGISTERED" not in type(e).__name__ and "AUTH_KEY_UNREGISTERED" not in str(e):
                     raise
                 print(f"Tentativa {attempt + 1} falhou (chave parcial), tentando de novo...")
-                for f in (_SESSION_FILE + ".session", _SESSION_FILE + ".session-journal"):
+            finally:
+                for f in (sess + ".session", sess + ".session-journal"):
                     try:
                         os.remove(f)
                     except OSError:
