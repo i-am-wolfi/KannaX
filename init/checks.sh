@@ -108,6 +108,8 @@ if uri.startswith("mongodb+srv://") and not os.access("/etc/resolv.conf", os.R_O
     except Exception:
         opts = ""
     q = "&".join(x for x in [p.query, opts] if x)
+    if "tls=" not in q and "ssl=" not in q:
+        q = (q + "&" if q else "") + "tls=true"
     auth = (p.username + (":" + p.password if p.password else "") + "@") if p.username else ""
     uri = urlunsplit(("mongodb", auth + ",".join(hosts), p.path or "/", q, ""))
 import pymongo

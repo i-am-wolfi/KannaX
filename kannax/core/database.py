@@ -54,6 +54,9 @@ def _direct_mongo_uri(uri: str) -> str:
     except Exception:
         opts = ""
     query = "&".join(q for q in [parts.query, opts] if q)
+    if "tls=" not in query and "ssl=" not in query:
+        # +srv implica TLS; sem isso o Atlas derruba a conexão
+        query = (query + "&" if query else "") + "tls=true"
     auth = ""
     if parts.username:
         auth = parts.username
