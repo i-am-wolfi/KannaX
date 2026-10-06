@@ -4,7 +4,7 @@
 #
 #editado por @fnixdev
 
-import gdshortener
+import requests
 
 from pyrogram.errors import YouBlockedUser
 from kannax import kannax, Message
@@ -42,13 +42,22 @@ async def is_gd(msg: Message):
     if not url:
         await msg.err("Bruh, preciso de um URL para encurtar")
         return
-    s = gdshortener.ISGDShortener()
     try:
-        s_url, stats = s.shorten(url, log_stat=True)
+        # is.gd API direta (gdshortener morreu, sem release p/ py3.14):
+        # https://is.gd/create.php?format=simple&url=...
+        resp = requests.get(
+            "https://is.gd/create.php",
+            params={"format": "simple", "url": url},
+            timeout=30,
+        )
+        resp.raise_for_status()
+        s_url = resp.text.strip()
+        if not s_url.startswith("https://"):
+            raise RuntimeError(s_url[:150])
     except Exception as er:
         await msg.err(str(er))
     else:
         await msg.edit(
-            f"**URL Encurtado:**\n`{s_url}`\n\n**Status:** `{stats}`",
+            f"**URL Encurtado:**\n`{s_url}`",
             disable_web_page_preview=True
         )
