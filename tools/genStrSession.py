@@ -1,7 +1,7 @@
 # Gera HU_STRING_SESSION (Pyrogram) para o Kanna-X.
-# ATENÇÃO: a STRING_SESSION do CatUserbot é do Telethon e NÃO serve aqui.
-# Use o MESMO API_ID / API_HASH do Cat, mas gere uma nova string nesta
-# ferramenta (ela usa Pyrogram). Rode: bash genStr   ou   .venv/bin/python tools/genStrSession.py
+# ATENÇÃO: strings do Telethon (ex: de outros userbots) NÃO servem aqui.
+# Use seu API_ID / API_HASH do https://my.telegram.org.
+# Rode: bash run-genstr.sh
 
 import asyncio
 import sys
@@ -14,7 +14,7 @@ from pyrogram import Client
 
 def main() -> None:
     print("=== Kanna-X — gerador de HU_STRING_SESSION (Pyrogram) ===")
-    print("Use o MESMO API_ID / API_HASH do seu CatUserbot.\n")
+    print("Pegue seu API_ID / API_HASH em https://my.telegram.org\n")
     api_id = int(input("Enter API_ID: ").strip())
     api_hash = input("Enter API_HASH: ").strip()
 
