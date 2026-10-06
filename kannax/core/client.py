@@ -136,7 +136,13 @@ class KannaX(_AbstractKannaX):
         if Config.HU_STRING_SESSION and Config.BOT_TOKEN:
             RawClient.DUAL_MODE = True
             kwargs['bot'] = KannaXBot(bot=self, **kwargs)
-        kwargs['session_name'] = Config.HU_STRING_SESSION or ":memory:"
+        session = (Config.HU_STRING_SESSION or "").strip().replace(" ", "").replace("\n", "")
+        if session and len(session) not in (351, 356):
+            raise ValueError(
+                f"HU_STRING_SESSION inválida (tamanho {len(session)}, esperado 351 ou 356). "
+                "Cole a string inteira sem espaços/quebras (bash run-genstr.sh gera de novo)."
+            )
+        kwargs['session_name'] = session or ":memory:"
         super().__init__(**kwargs)
         self.executor.shutdown()
         self.executor = pool._get()  # pylint: disable=protected-access
