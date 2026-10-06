@@ -61,6 +61,5 @@ feedparser>=6.0.2
 validators>=0.22.0
 colour>=0.1.5
 gtts>=2.4.0
-justwatch>=0.5.1
 flag>=0.1.0
 glitch_this>=1.0.3
