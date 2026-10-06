@@ -17,13 +17,24 @@ def main() -> None:
     api_hash = input("Enter API_HASH: ").strip()
 
     async def _gen() -> str:
-        async with Client(":memory:", api_id=api_id, api_hash=api_hash) as app:
-            session = await app.export_session_string()
-            await app.send_message(
-                "me",
-                f"#KannaX #HU_STRING_SESSION\n\n`{session}`\n\nCole no config.env como HU_STRING_SESSION.",
-            )
-            return session
+        # login pode falhar 1x com AUTH_KEY_UNREGISTERED (chave parcial);
+        # tenta de novo com sessão limpa
+        last_err = None
+        for attempt in range(2):
+            try:
+                async with Client(":memory:", api_id=api_id, api_hash=api_hash) as app:
+                    session = await app.export_session_string()
+                    await app.send_message(
+                        "me",
+                        f"#KannaX #HU_STRING_SESSION\n\n`{session}`\n\nCole no config.env como HU_STRING_SESSION.",
+                    )
+                    return session
+            except Exception as e:
+                last_err = e
+                if "AUTH_KEY_UNREGISTERED" not in type(e).__name__ and "AUTH_KEY_UNREGISTERED" not in str(e):
+                    raise
+                print(f"Tentativa {attempt + 1} falhou (chave parcial), tentando de novo...")
+        raise last_err
 
     session = asyncio.run(_gen())
     print("\nPronto! Sua HU_STRING_SESSION (cole no config.env):\n")
