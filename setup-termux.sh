@@ -19,6 +19,9 @@ command -v pkg >/dev/null 2>&1 || die "comando 'pkg' não encontrado."
 # por cima desses quebra. A venv abaixo usa --system-site-packages para
 # enxergá-los, e o pip os considera satisfeitos.
 PKG_PYTHON_DEPS="python-numpy python-pillow python-lxml python-psutil python-cryptography"
+# pymongo (dep do motor) não existe em alguns índices: tenta o pacote do
+# Termux primeiro; se não houver, o pip tenta sozinho e pode falhar.
+PKG_OPTIONAL_DEPS="python-pymongo"
 
 info "atualizando pacotes..."
 pkg update -y || die "falha no pkg update"
@@ -27,6 +30,8 @@ info "instalando dependências do sistema..."
 pkg install -y python git jq curl tmux libjpeg-turbo zlib openssl clang \
     $PKG_PYTHON_DEPS \
     || die "falha no pkg install"
+pkg install -y $PKG_OPTIONAL_DEPS 2>/dev/null \
+    && ok "deps opcionais do pkg ok" || info "sem $PKG_OPTIONAL_DEPS no pkg (pip vai tentar)"
 # NOTA: ffmpeg removido temporariamente (travava a instalação no Termux).
 # Plugins de mídia que precisam dele (conversões, voice, etc.) ficam
 # degradados até reinstalar: pkg install ffmpeg
