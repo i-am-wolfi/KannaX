@@ -92,9 +92,27 @@ print(quote_plus("'$uNameAndPass'"))')
 _checkDatabase() {
     editLastMessage "Verificando DATABASE_URL ..."
     local mongoErr=$(runPythonCode '
+import os
+uri = "'$DATABASE_URL'"
+if uri.startswith("mongodb+srv://") and not os.access("/etc/resolv.conf", os.R_OK):
+    # Termux: sem resolv.conf o pymongo morre no SRV; resolve aqui com
+    # nameserver explícito e reescreve p/ mongodb:// direto
+    from urllib.parse import urlsplit, urlunsplit
+    import dns.resolver
+    p = urlsplit(uri)
+    r = dns.resolver.Resolver(configure=False)
+    r.nameservers = ["8.8.8.8", "1.1.1.1"]
+    hosts = sorted({f"{str(x.target).rstrip(chr(46))}:{x.port}" for x in r.resolve("_mongodb._tcp." + p.hostname, "SRV")})
+    try:
+        opts = "&".join(s.decode().strip(chr(34)) for t in r.resolve(p.hostname, "TXT") for s in t.strings)
+    except Exception:
+        opts = ""
+    q = "&".join(x for x in [p.query, opts] if x)
+    auth = (p.username + (":" + p.password if p.password else "") + "@") if p.username else ""
+    uri = urlunsplit(("mongodb", auth + ",".join(hosts), p.path or "/", q, ""))
 import pymongo
 try:
-    pymongo.MongoClient("'$DATABASE_URL'").list_database_names()
+    pymongo.MongoClient(uri).list_database_names()
 except Exception as e:
     print(e)')
     [[ $mongoErr ]] && quit "pymongo response > $mongoErr" || log "\tpymongo response > {status : 200}"
