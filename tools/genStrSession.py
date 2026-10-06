@@ -18,10 +18,12 @@ def main() -> None:
 
     async def _gen() -> str:
         async with Client(":memory:", api_id=api_id, api_hash=api_hash) as app:
+            session = await app.export_session_string()
             await app.send_message(
-                "me", "#KannaX #HU_STRING_SESSION\n\nA sua string vai aparecer no terminal."
+                "me",
+                f"#KannaX #HU_STRING_SESSION\n\n`{session}`\n\nCole no config.env como HU_STRING_SESSION.",
             )
-            return await app.export_session_string()
+            return session
 
     session = asyncio.run(_gen())
     print("\nPronto! Sua HU_STRING_SESSION (cole no config.env):\n")
