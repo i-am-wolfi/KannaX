@@ -60,7 +60,6 @@ spotipy
 scikit-image
 telegraph>=1.4.1
 sqlalchemy>=1.4
-pickledb
 tgcrypto
 urbandict>=0.5
 wget>=3.2
