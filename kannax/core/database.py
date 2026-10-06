@@ -7,6 +7,7 @@
 __all__ = ['get_collection']
 
 import asyncio
+import os
 from typing import List
 
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -19,7 +20,51 @@ _LOG_STR = "$$$>>> %s <<<$$$"
 
 logbot.edit_last_msg("Conectando-se a Database ...", _LOG.info, _LOG_STR)
 
-_MGCLIENT: AgnosticClient = AsyncIOMotorClient(Config.DB_URI)
+
+def _direct_mongo_uri(uri: str) -> str:
+    """Rewrite mongodb+srv:// to direct mongodb:// on systems without
+    /etc/resolv.conf (Termux): pymongo's SRV lookup reads resolv.conf
+    and dies with 'cannot open /etc/resolv.conf'. Plain hostnames
+    resolve fine via libc, so resolve SRV+T SVD once here with an
+    explicit nameserver and bake the hosts into the URI.
+    """
+    if not uri.startswith("mongodb+srv://") or os.access("/etc/resolv.conf", os.R_OK):
+        return uri
+    try:
+        from urllib.parse import urlsplit, urlunsplit
+        import dns.resolver
+    except ImportError as e:
+        raise RuntimeError(f"mongo+srv sem resolv.conf e sem dnspython: {e}")
+    parts = urlsplit(uri)
+    host = parts.hostname or ""
+    resolver = dns.resolver.Resolver(configure=False)
+    resolver.nameservers = ["8.8.8.8", "1.1.1.1"]
+    answers = resolver.resolve(f"_mongodb._tcp.{host}", "SRV")
+    hosts = sorted(
+        {f"{str(r.target).rstrip('.')}:{r.port}" for r in answers},
+        key=lambda h: h,
+    )
+    if not hosts:
+        raise RuntimeError(f"SRV vazio para {host}")
+    try:
+        txt = resolver.resolve(host, "TXT")
+        opts = "&".join(
+            s.decode().strip('"') for r in txt for s in r.strings
+        )
+    except Exception:
+        opts = ""
+    query = "&".join(q for q in [parts.query, opts] if q)
+    auth = ""
+    if parts.username:
+        auth = parts.username
+        if parts.password:
+            auth += f":{parts.password}"
+        auth += "@"
+    path = parts.path or "/"
+    return urlunsplit(("mongodb", f"{auth}{','.join(hosts)}", path, query, ""))
+
+
+_MGCLIENT: AgnosticClient = AsyncIOMotorClient(_direct_mongo_uri(Config.DB_URI))
 _RUN = asyncio.get_event_loop().run_until_complete
 
 if "KannaX" in _RUN(_MGCLIENT.list_database_names()):
