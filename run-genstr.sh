@@ -15,4 +15,4 @@ if [[ ! -x "$GENV/bin/python" ]]; then
     "$GENV/bin/pip" install -q "pyrogram>=2" tgcrypto || "$GENV/bin/pip" install -q "pyrogram>=2" \
         || { echo "❌ falha ao instalar pyrogram v2"; exit 1; }
 fi
-"$GENV/bin/python" tools/genStrSession.py
+PYTHONPATH="$DIR/tools/py314:${PYTHONPATH:-}" "$GENV/bin/python" tools/genStrSession.py
