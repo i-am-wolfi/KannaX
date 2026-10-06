@@ -31,6 +31,11 @@ def main() -> None:
             try:
                 async with Client(_SESSION_FILE, api_id=api_id, api_hash=api_hash) as app:
                     session = await app.export_session_string()
+                    if len(session.strip()) not in (351, 356):
+                        raise RuntimeError(
+                            f"string gerada com tamanho estranho ({len(session)}). Tente de novo."
+                        )
+                    session = session.strip()
                     await app.send_message(
                         "me",
                         f"#KannaX #HU_STRING_SESSION\n\n`{session}`\n\nCole no config.env como HU_STRING_SESSION.",
