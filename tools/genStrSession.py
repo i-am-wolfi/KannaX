@@ -6,8 +6,11 @@
 # Rode: bash run-genstr.sh
 
 import asyncio
+import os
 
 from pyrogram import Client
+
+_SESSION_FILE = "genstr_tmp"
 
 
 def main() -> None:
@@ -17,12 +20,16 @@ def main() -> None:
     api_hash = input("Enter API_HASH: ").strip()
 
     async def _gen() -> str:
-        # login pode falhar 1x com AUTH_KEY_UNREGISTERED (chave parcial);
-        # tenta de novo com sessão limpa
+        # sessão em arquivo (a ":memory:" perdia a chave no Termux) + retry
+        for f in (_SESSION_FILE + ".session", _SESSION_FILE + ".session-journal"):
+            try:
+                os.remove(f)
+            except OSError:
+                pass
         last_err = None
         for attempt in range(2):
             try:
-                async with Client(":memory:", api_id=api_id, api_hash=api_hash) as app:
+                async with Client(_SESSION_FILE, api_id=api_id, api_hash=api_hash) as app:
                     session = await app.export_session_string()
                     await app.send_message(
                         "me",
@@ -34,6 +41,11 @@ def main() -> None:
                 if "AUTH_KEY_UNREGISTERED" not in type(e).__name__ and "AUTH_KEY_UNREGISTERED" not in str(e):
                     raise
                 print(f"Tentativa {attempt + 1} falhou (chave parcial), tentando de novo...")
+                for f in (_SESSION_FILE + ".session", _SESSION_FILE + ".session-journal"):
+                    try:
+                        os.remove(f)
+                    except OSError:
+                        pass
         raise last_err
 
     session = asyncio.run(_gen())

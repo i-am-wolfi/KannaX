@@ -155,3 +155,4 @@ resources/font.ttf
 resources/Roboto-Medium.tff
 .xtra_updated*
 .venv-genstr/
+genstr_tmp.session*
