@@ -8,7 +8,7 @@ Testado como alvo: Android ARM64, Termux do F-Droid (não use a versão da Play 
 pkg update -y
 pkg install -y python git ffmpeg jq curl tmux libjpeg-turbo zlib openssl
 # pré-compilados do Termux (evitam compilar via pip, que quebra):
-pkg install -y python-numpy python-pillow python-lxml python-psutil
+pkg install -y python-numpy python-pillow python-lxml python-psutil python-cryptography
 ```
 
 > `tgcrypto` foi removido do `requirements-termux.txt` (não compila bem no
