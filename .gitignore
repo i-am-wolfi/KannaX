@@ -154,3 +154,4 @@ resources/Roboto-Regular.ttf
 resources/font.ttf
 resources/Roboto-Medium.tff
 .xtra_updated*
+.venv-genstr/

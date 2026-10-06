@@ -1,13 +1,11 @@
 # Gera HU_STRING_SESSION (Pyrogram) para o Kanna-X.
-# ATENÇÃO: strings do Telethon (ex: de outros userbots) NÃO servem aqui.
+# Roda no pyrogram v2 (venv isolada .venv-genstr): o 1.4.16 do bot é
+# bloqueado pelo Telegram em logins novos (406 UPDATE_APP_TO_LOGIN).
+# A string gerada aqui serve no 1.4.16 normalmente.
 # Use seu API_ID / API_HASH do https://my.telegram.org.
 # Rode: bash run-genstr.sh
 
 import asyncio
-import sys
-
-sys.path.insert(0, "tools/py314")
-import sitecustomize  # noqa: F401  (shim asyncio p/ Python 3.10+)
 
 from pyrogram import Client
 
@@ -25,7 +23,7 @@ def main() -> None:
             )
             return await app.export_session_string()
 
-    session = asyncio.get_event_loop().run_until_complete(_gen())
+    session = asyncio.run(_gen())
     print("\nPronto! Sua HU_STRING_SESSION (cole no config.env):\n")
     print(session)
     print("\nUma cópia/aviso também foi enviada para suas Mensagens Salvas.")
