@@ -13,7 +13,10 @@ from typing import List, Optional, Tuple
 
 from html_telegraph_poster import TelegraphPoster
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
-from ujson import loads
+try:
+    from ujson import loads
+except ImportError:  # termux: sem wheel py3.13+
+    from json import loads
 from kannax import Config
 import kannax
 

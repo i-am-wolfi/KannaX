@@ -6,7 +6,10 @@ import os
 from asyncio import gather
 from re import compile as comp_regex
 
-import ujson
+try:
+    import ujson
+except ImportError:  # termux: sem wheel py3.13+
+    import json as ujson
 from pyrogram.errors import BadRequest, UserIsBot
 from pyrogram.types import ReplyKeyboardRemove
 

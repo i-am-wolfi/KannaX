@@ -5,7 +5,10 @@
 import asyncio
 import os
 
-import ujson
+try:
+    import ujson
+except ImportError:  # termux: sem wheel py3.13+
+    import json as ujson
 from pyrogram import filters
 from pyrogram.errors import BadRequest, FloodWait
 from pyrogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup

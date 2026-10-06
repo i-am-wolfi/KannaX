@@ -6,7 +6,10 @@ import datetime
 import os
 from uuid import uuid1
 
-import ujson
+try:
+    import ujson
+except ImportError:  # termux: sem wheel py3.13+
+    import json as ujson
 from pyrogram import filters
 from pyrogram.errors import MessageNotModified, UserIsBlocked
 from pyrogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup

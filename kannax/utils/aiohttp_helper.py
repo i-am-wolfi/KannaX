@@ -6,7 +6,10 @@
 import asyncio
 from typing import Dict, Optional
 
-import ujson
+try:
+    import ujson
+except ImportError:  # termux: sem wheel py3.13+
+    import json as ujson
 from aiohttp import ClientSession, ClientTimeout
 
 # """

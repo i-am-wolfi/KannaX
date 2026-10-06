@@ -6,7 +6,10 @@ import base64
 from math import ceil
 from typing import Any, Callable, Dict, List, Union
 from random import choice
-import ujson
+try:
+    import ujson
+except ImportError:  # termux: sem wheel py3.13+
+    import json as ujson
 from html_telegraph_poster import TelegraphPoster
 from pyrogram import filters
 from pyrogram.errors import BadRequest, MessageIdInvalid, MessageNotModified

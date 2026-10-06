@@ -10,7 +10,10 @@ from pathlib import Path
 from re import compile as comp_regex
 from time import time
 
-import ujson
+try:
+    import ujson
+except ImportError:  # termux: sem wheel py3.13+
+    import json as ujson
 import youtube_dl
 from pyrogram import filters
 from pyrogram.types import (
