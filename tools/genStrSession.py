@@ -6,9 +6,33 @@
 # Rode: bash run-genstr.sh
 
 import asyncio
+import base64
 import os
+import struct
 
 from pyrogram import Client
+
+
+def _to_v1_string(session: str) -> str:
+    """Converte string do pyrogram v2 (362 chars) p/ formato 1.4 (356).
+
+    v2 empacota ">BI?256sQ?" (271 bytes); 1.4 lê ">B?256sQ?" (267 bytes)
+    quando o user_id passa de 32 bits. Reempacota preservando
+    dc_id, test_mode, auth_key, user_id e is_bot.
+    """
+    session = session.strip()
+    if len(session) in (351, 356):
+        return session  # já é formato 1.4
+    raw = base64.urlsafe_b64decode(session + "=" * (-len(session) % 4))
+    if len(raw) == 271:  # >BI?256sQ?
+        dc_id, _old, test_mode, auth_key, user_id, is_bot = struct.unpack(">BI?256sQ?", raw)
+        packed = struct.pack(">B?256sQ?", dc_id, test_mode, auth_key, user_id, is_bot)
+    else:
+        raise RuntimeError(f"formato de string desconhecido ({len(session)} chars).")
+    out = base64.urlsafe_b64encode(packed).decode().rstrip("=")
+    if len(out) not in (351, 356):
+        raise RuntimeError("conversão falhou, tente de novo.")
+    return out
 
 
 def main() -> None:
@@ -30,11 +54,7 @@ def main() -> None:
                     me = await app.get_me()
                     print(f"Logado como: {me.first_name} (id={me.id})")
                     session = await app.export_session_string()
-                    if len(session.strip()) not in (351, 356):
-                        raise RuntimeError(
-                            f"string gerada com tamanho estranho ({len(session)}). Tente de novo."
-                        )
-                    session = session.strip()
+                    session = _to_v1_string(session.strip())
                     await app.send_message(
                         "me",
                         f"#KannaX #HU_STRING_SESSION\n\n`{session}`\n\nCole no config.env como HU_STRING_SESSION.",
