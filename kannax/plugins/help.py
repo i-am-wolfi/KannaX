@@ -99,24 +99,51 @@ async def _init() -> None:
     "help", about={"header": "Guia para usar os comandos KannaX"}, allow_channels=False
 )
 async def helpme(message: Message) -> None:
+    try:
+        await _helpme(message)
+    except Exception as e:
+        # nunca morra em silêncio: manda o erro em texto puro
+        try:
+            await message.edit(f"help falhou: {e}\n\nTente `.help <comando>`.",
+                               parse_mode=None, disable_web_page_preview=True)
+        except Exception:
+            pass
+
+
+async def _helpme(message: Message) -> None:
     plugins = kannax.manager.enabled_plugins
     if not message.input_str:
-        out_str = (
+        header = (
             f"""⚒ <b><u>(<code>{len(plugins)}</code>) Plugin(s) Disponivel</u></b>\n\n"""
         )
         cat_plugins = kannax.manager.get_plugins()
+        chunks, cur = [], header
         for cat in sorted(cat_plugins):
             if cat == "plugins":
                 continue
-            out_str += (
+            block = (
                 f"    {_CATEGORY.get(cat, '📁')} <b>{cat}</b> "
                 f"(<code>{len(cat_plugins[cat])}</code>) :   <code>"
                 + "</code>    <code>".join(sorted(cat_plugins[cat]))
                 + "</code>\n\n"
             )
-        out_str += (
-            f"""📕 <mb>Uso:</b>  <code>{Config.CMD_TRIGGER}help [nome do plugin]</code>"""
+            if len(cur) + len(block) > 3800:
+                chunks.append(cur)
+                cur = ""
+            cur += block
+        footer = (
+            f"""📕 <b>Uso:</b>  <code>{Config.CMD_TRIGGER}help [nome do plugin]</code>"""
         )
+        if len(cur) + len(footer) > 4000:
+            chunks.append(cur)
+            cur = ""
+        chunks.append(cur + footer)
+        await message.edit(chunks[0], del_in=0, parse_mode="html",
+                           disable_web_page_preview=True)
+        for chunk in chunks[1:]:
+            await message.reply(chunk, parse_mode="html",
+                                disable_web_page_preview=True)
+        return
     else:
         key = message.input_str
         if (
@@ -149,6 +176,12 @@ async def helpme(message: Message) -> None:
                 out_str = f"<code>{key_}</code>\n\n{commands[key_].about}"
             else:
                 out_str = f"<i>Nenhum módulo ou comando encontrado para</i>: <code>{message.input_str}</code>"
+    if len(out_str) > 4000:
+        await message.edit(out_str[:4000], del_in=0, parse_mode=None,
+                           disable_web_page_preview=True)
+        await message.reply(out_str[4000:4096 * 3], parse_mode=None,
+                            disable_web_page_preview=True)
+        return
     await message.edit(
         out_str, del_in=0, parse_mode="html", disable_web_page_preview=True
     )
