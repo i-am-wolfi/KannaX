@@ -21,11 +21,29 @@ _UA = {
     "Accept-Language": "en-US,en;q=0.9",
 }
 _SITEMAP_URL = "https://www.gsmarena.com/sitemaps/phones.xml"
+_MAKERS_URL = "https://www.gsmarena.com/makers.php3"
 _SITEMAP_TTL = 7 * 24 * 3600  # refresh weekly
+_BRAND_TTL = 14 * 24 * 3600  # lista de marcas
 _SEARCH_TTL = 7 * 24 * 3600  # cache de busca online (acerto)
 _SEARCH_MISS_TTL = 3600  # cache de busca sem resultado (curto: pode ter sido rate limit)
 _CAPTION_LIMIT = 1000  # limite real do Telegram é 1024 (folga p/ markdown)
 _PHONE_URL_RE = re.compile(r"^https://www\.gsmarena\.com/[a-z0-9_]+-\d+\.php$")
+
+# apelidos comuns -> nome da marca no GSM Arena
+_BRAND_ALIASES = {
+    "galaxy": "samsung",
+    "iphone": "apple",
+    "poco": "xiaomi",
+    "redmi": "xiaomi",
+    "pixel": "google",
+    "moto": "motorola",
+    "edge": "motorola",
+    "zenfone": "asus",
+    "rog": "asus",
+    "nord": "oneplus",
+    "find": "oppo",
+    "reno": "oppo",
+}
 
 # ordem de importância das linhas do card (as últimas caem primeiro
 # quando a ficha precisa caber na legenda da foto)
@@ -122,13 +140,13 @@ def _variants(query: str) -> list:
     return out
 
 
-def _local_match(query: str, index: list, limit: int) -> list:
-    """Match query against the local GSM Arena sitemap index.
+def _score(query: str, index: list, limit: int) -> list:
+    """Casa a query contra uma lista de (name, url).
 
     Retorna (results, confident): results no formato (name, url).
     confident=True só quando a query EXATA bateu por completo — os
     fallbacks (j500m -> j5) são só último recurso, para não devolver o
-    aparelho errado quando existe um mais novo fora do sitemap.
+    aparelho errado quando existe um mais novo fora do índice.
     """
     best = []
     for i, variant in enumerate(_variants(query)):
@@ -162,6 +180,89 @@ def _local_match(query: str, index: list, limit: int) -> list:
         if scored and (not best or scored[0] > best[0]):
             best = scored
     return [(n, u) for _, _, _, _, n, u in best[:limit]], False
+
+
+def _local_match(query: str, index: list, limit: int) -> list:
+    """Match contra o índice local (sitemap do GSM Arena)."""
+    return _score(query, index, limit)
+
+
+def _brand_list() -> list:
+    """(name, url) das marcas do GSM Arena (makers.php3), em cache.
+
+    Serve para achar aparelhos novos: a página de marca lista os
+    lançamentos mais recentes, então dá para procurar nela mesmo com o
+    sitemap defasado.
+    """
+    path = os.path.join(_cache_dir(), "brands.json")
+    if os.path.isfile(path) and time.time() - os.path.getmtime(path) < _BRAND_TTL:
+        try:
+            with open(path, encoding="utf-8") as f:
+                return [tuple(x) for x in json.load(f)]
+        except Exception:
+            pass
+    try:
+        resp = requests.get(_MAKERS_URL, headers=_UA, timeout=40)
+        resp.raise_for_status()
+    except Exception:
+        return []
+    brands = []
+    for href, name in re.findall(
+        r'href="(https://www\.gsmarena\.com/[a-z0-9_\-]+-phones-\d+\.php)"[^>]*>(.*?)</a>',
+        resp.text,
+        re.S,
+    ):
+        label = re.sub(r"<[^>]+>", " ", name)
+        label = re.sub(r"\s+", " ", label).strip()
+        if label and (label, href) not in brands:
+            brands.append((label, href))
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(brands, f)
+    except Exception:
+        pass
+    return brands
+
+
+def _brands_for_query(query: str) -> list:
+    """URLs de páginas de marca prováveis para a query."""
+    toks = set(_norm(query))
+    urls = []
+    for tok in toks:
+        b = _BRAND_ALIASES.get(tok)
+        if b:
+            urls.append(b)
+    brands = _brand_list()
+    for name, url in brands:
+        nt = set(_norm(name))
+        if nt and nt <= toks:
+            urls.append(name)
+    out = []
+    for key in urls:
+        for name, url in brands:
+            if name.lower() == key.lower() or url == key:
+                if url not in out:
+                    out.append(url)
+                break
+    return out[:3]
+
+
+def _brand_fallback(query: str, limit: int) -> list:
+    """Procura a query nas páginas de marca (aparelhos novos)."""
+    for url in _brands_for_query(query):
+        try:
+            resp = requests.get(url, headers=_UA, timeout=40)
+            if resp.status_code != 200:
+                continue
+        except Exception:
+            continue
+        index = [(_slug_name(u), u) for u in _extract_phone_urls(resp.text, 200)]
+        if not index:
+            continue
+        results, confident = _score(query, index, limit)
+        if confident:
+            return results
+    return []
 
 
 def _extract_phone_urls(html: str, limit: int) -> list:
@@ -272,13 +373,22 @@ def _web_search(query: str, limit: int = 6) -> list:
 
 
 def _search_models(query: str, limit: int = 6) -> list:
-    """Localiza o aparelho no sitemap e, se necessário, na web."""
+    """Localiza o aparelho: sitemap → páginas de marca (aparelhos novos) → web → sitemap fuzzy."""
     if not _norm(query):
         return []
     index = _load_index()
     results, confident = _local_match(query, index, limit)
     if confident:
         return results
+    # 1) tenta páginas de marca do próprio GSM Arena (usa a página da marca;
+    #    cobre aparelhos novos que ainda não estão no sitemap)
+    try:
+        brand_res = _brand_fallback(query, limit)
+    except Exception:
+        brand_res = []
+    if brand_res:
+        return brand_res
+    # 2) fallback web (buscadores, etc.)
     try:
         web = _web_search(query, limit)
     except Exception:
